@@ -50,12 +50,20 @@ export default function HomePage() {
               Every AI model. Every app. Every video call. All running on a data center.
               Learn exactly how — and build one yourself.
             </p>
-            <Link
-              href={session ? "/dashboard" : "/login"}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl hover:from-emerald-400 hover:to-emerald-500 transition-all hover:scale-105 shadow-lg shadow-emerald-500/25 text-lg"
-            >
-              {session ? "Go to Dashboard" : "Get Started"} <ArrowRight className="w-5 h-5" />
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href={session ? "/dashboard" : "/login"}
+                className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl hover:from-emerald-400 hover:to-emerald-500 transition-all hover:scale-105 shadow-lg shadow-emerald-500/25 text-lg"
+              >
+                {session ? "Go to Dashboard" : "Get Started"} <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                href="/demo"
+                className="inline-flex items-center justify-center gap-2 bg-slate-700 border border-slate-600 text-white font-bold py-4 px-8 rounded-xl hover:bg-slate-600 transition-all hover:scale-105 text-lg"
+              >
+                Try Demo <Gamepad2 className="w-5 h-5" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
