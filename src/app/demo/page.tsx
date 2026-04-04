@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { cpus, rams, storages, gpus, networkCards, powerSupplies } from "@/lib/data/components";
 import { quizQuestions } from "@/lib/data/challenges";
 import { workloads } from "@/lib/data/workloads";
@@ -8,8 +8,11 @@ import type { CPUSpec, RAMSpec, StorageSpec, GPUSpec, NetworkCard, PowerSupply }
 import {
   Cpu, BookOpen, Gamepad2, Trophy, Star, Check, X,
   ChevronDown, ChevronUp, Lock, Sparkles, Globe, Cloud,
+  Calculator, Timer, Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { AchievementToast, type Achievement } from "@/components/AchievementToast";
+import { quickMultiply, percentageOf, digitSumVerify } from "@/lib/vedic-math";
 
 // ─── Component Learning Data ───
 const componentInfo = [
@@ -130,8 +133,111 @@ const demoChallenges: DemoChallenge[] = [
     cloudEquiv: "AWS p4d.24xlarge (~$24K/mo) or Azure ND A100 v4 (~$20K/mo)" },
 ];
 
+// ─── Personality Quiz ───
+const WORKLOAD_KEYS = ["video", "game", "ai", "web", "db"] as const;
+type WorkloadKey = (typeof WORKLOAD_KEYS)[number];
+
+const personalityQs: { q: string; opts: { label: string; maps: WorkloadKey }[] }[] = [
+  { q: "What's your favorite thing to do online?", opts: [
+    { label: "Watch videos 🎬", maps: "video" },
+    { label: "Play games 🎮", maps: "game" },
+    { label: "Learn new stuff 🧠", maps: "ai" },
+    { label: "Chat with friends 💬", maps: "web" },
+    { label: "Build & create 🔨", maps: "db" },
+  ]},
+  { q: "Your brain-computer would be best at...", opts: [
+    { label: "Running super fast ⚡", maps: "game" },
+    { label: "Remembering everything 🗄️", maps: "db" },
+    { label: "Drawing amazing art 🎨", maps: "video" },
+    { label: "Talking to everyone 📣", maps: "web" },
+    { label: "Solving puzzles 🧩", maps: "ai" },
+  ]},
+  { q: "Your dream project is...", opts: [
+    { label: "Viral YouTube channel 📹", maps: "video" },
+    { label: "Minecraft mega-world 🌍", maps: "game" },
+    { label: "Teach a robot to dance 🤖", maps: "ai" },
+    { label: "Lemonade stand empire 🍋", maps: "web" },
+    { label: "Secret recipe vault 📚", maps: "db" },
+  ]},
+  { q: "Pick a superpower:", opts: [
+    { label: "Super speed 💨", maps: "game" },
+    { label: "Perfect memory 🧠", maps: "db" },
+    { label: "X-ray vision 👁️", maps: "ai" },
+    { label: "Teleportation 🌀", maps: "web" },
+    { label: "Time rewind ⏪", maps: "video" },
+  ]},
+  { q: "Weekend plans?", opts: [
+    { label: "Movie marathon 🎥", maps: "video" },
+    { label: "Game tournament 🏆", maps: "game" },
+    { label: "Science experiment 🧪", maps: "ai" },
+    { label: "Hanging with friends 🎉", maps: "web" },
+    { label: "Organizing my stuff 📦", maps: "db" },
+  ]},
+];
+
+const personalityResults: Record<WorkloadKey, { title: string; desc: string; emoji: string; challengeId: string }> = {
+  video: { title: "Video Streamer", emoji: "🎬", desc: "You love content that moves! You'd thrive building servers that push massive amounts of data to millions of screens.", challengeId: "ch3" },
+  game: { title: "Game Architect", emoji: "🎮", desc: "You live for action and speed! Low-latency game servers are your jam — every millisecond counts.", challengeId: "ch2" },
+  ai: { title: "AI Trainer", emoji: "🧠", desc: "You're a puzzle-solver and pattern-spotter. GPU-packed AI training rigs are your future battlefield.", challengeId: "ch5" },
+  web: { title: "Web Hero", emoji: "🌐", desc: "You connect people. Web servers that stay up no matter what traffic hits them — that's you.", challengeId: "ch1" },
+  db: { title: "Data Guardian", emoji: "🗄️", desc: "You never forget a detail. Databases are your domain — where every byte is sacred.", challengeId: "ch4" },
+};
+
+// ─── Math Dojo Problem Generator ───
+interface MathProblem {
+  question: string;
+  answer: number;
+  explanation: string;
+  hint: string;
+}
+function generateMathProblem(): MathProblem {
+  const types = ["multiply", "percent", "subtract", "verify"];
+  const t = types[Math.floor(Math.random() * types.length)];
+  if (t === "multiply") {
+    const a = 90 + Math.floor(Math.random() * 19); // 90-108
+    const b = 90 + Math.floor(Math.random() * 19);
+    const r = quickMultiply(a, b);
+    return { question: `What is ${a} × ${b}?`, answer: r.result, explanation: r.explanation,
+      hint: "Tip: Both numbers are close to 100. Use Nikhilam!" };
+  }
+  if (t === "percent") {
+    const pcts = [5, 10, 15, 20, 25, 30];
+    const p = pcts[Math.floor(Math.random() * pcts.length)];
+    const n = (2 + Math.floor(Math.random() * 9)) * 1000; // 2000-10000
+    const r = percentageOf(p, n);
+    return { question: `What is ${p}% of $${n.toLocaleString()}?`, answer: r.result, explanation: r.explanation,
+      hint: "Tip: 10% is just moving the decimal. Build up from there!" };
+  }
+  if (t === "subtract") {
+    const budget = (5 + Math.floor(Math.random() * 6)) * 1000;
+    const spent = Math.floor(budget * (0.4 + Math.random() * 0.4));
+    return { question: `Budget $${budget.toLocaleString()}, spent $${spent.toLocaleString()}. How much left?`,
+      answer: budget - spent,
+      explanation: `Vedic subtraction: subtract each digit from 9, last from 10.\n$${budget.toLocaleString()} - $${spent.toLocaleString()} = $${(budget - spent).toLocaleString()}`,
+      hint: "Tip: Subtract digits from 9, last digit from 10." };
+  }
+  // verify
+  const a = 20 + Math.floor(Math.random() * 60);
+  const b = 20 + Math.floor(Math.random() * 60);
+  const correctProduct = a * b;
+  const showWrong = Math.random() < 0.5;
+  const shown = showWrong ? correctProduct + (Math.random() < 0.5 ? 9 : -9) : correctProduct;
+  const r = digitSumVerify(a, b, shown);
+  return { question: `Is ${a} × ${b} = ${shown}? (1 = Yes, 0 = No)`, answer: r.result, explanation: r.explanation,
+    hint: "Tip: Add the digits. Digit-sum of A × digit-sum of B should match digit-sum of the answer." };
+}
+
+function rankFromScore(s: number): { rank: string; emoji: string } {
+  if (s >= 900) return { rank: "Grandmaster", emoji: "👑" };
+  if (s >= 600) return { rank: "Master", emoji: "🏆" };
+  if (s >= 300) return { rank: "Scholar", emoji: "📚" };
+  return { rank: "Apprentice", emoji: "🌱" };
+}
+
+type TabKey = "learn" | "workloads" | "quiz" | "build" | "dojo";
+
 export default function DemoPage() {
-  const [tab, setTab] = useState<"learn" | "workloads" | "quiz" | "build">("learn");
+  const [tab, setTab] = useState<TabKey>("learn");
   const [expandedComponent, setExpandedComponent] = useState<number | null>(null);
   const [expandedWorkload, setExpandedWorkload] = useState<number | null>(null);
 
@@ -153,6 +259,44 @@ export default function DemoPage() {
   const [buildSubmitted, setBuildSubmitted] = useState(false);
   const [buildScore, setBuildScore] = useState(0);
   const [buildFeedback, setBuildFeedback] = useState<string[]>([]);
+
+  // Boot sequence state
+  const [booting, setBooting] = useState(false);
+  const [bootStep, setBootStep] = useState(0);
+  const [bootResults, setBootResults] = useState<{ label: string; status: "ok" | "fail" | "skip"; detail: string }[]>([]);
+  const [bootComplete, setBootComplete] = useState(false);
+  const [bootSuccess, setBootSuccess] = useState(false);
+
+  // Speed Run state
+  const [speedRunOn, setSpeedRunOn] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(120);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [buildStartTime, setBuildStartTime] = useState<number | null>(null);
+  const [finalBuildTime, setFinalBuildTime] = useState<number | null>(null);
+
+  // Achievements
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+
+  // Live Math Coach sidebar
+  const [mathLog, setMathLog] = useState<string[]>([]);
+  const [mathLogOpen, setMathLogOpen] = useState(true);
+
+  // Personality quiz
+  const [pqStep, setPqStep] = useState(-1); // -1 = not started
+  const [pqAnswers, setPqAnswers] = useState<WorkloadKey[]>([]);
+  const [pqResult, setPqResult] = useState<WorkloadKey | null>(null);
+
+  // Math Dojo
+  const [dojoStarted, setDojoStarted] = useState(false);
+  const [dojoRound, setDojoRound] = useState(0);
+  const [dojoProblem, setDojoProblem] = useState<MathProblem | null>(null);
+  const [dojoInput, setDojoInput] = useState("");
+  const [dojoScore, setDojoScore] = useState(0);
+  const [dojoStreak, setDojoStreak] = useState(0);
+  const [dojoTimer, setDojoTimer] = useState(30);
+  const [dojoFeedback, setDojoFeedback] = useState<{ correct: boolean; explanation: string; answer: number } | null>(null);
+  const [dojoStartTime, setDojoStartTime] = useState(0);
+  const [dojoDone, setDojoDone] = useState(false);
 
   const challengeWorkload = useMemo(() => workloads.find(w => w.id === selectedChallenge.workloadId) ?? workloads[0], [selectedChallenge]);
   const questions = quizQuestions[1] || [];
@@ -182,6 +326,62 @@ export default function DemoPage() {
 
   const budgetLeft = BUDGET - totalCost;
 
+  const unlockedIds = useMemo(() => new Set(achievements.map((a) => a.id)), [achievements]);
+  const unlock = (a: Achievement) => {
+    if (unlockedIds.has(a.id)) return;
+    setAchievements((prev) => [...prev, a]);
+  };
+
+  const componentsPicked = (selectedCPU ? 1 : 0) + selectedRAM.length + selectedStorage.length +
+    (selectedGPU ? 1 : 0) + (selectedNIC ? 1 : 0) + (selectedPSU ? 1 : 0);
+
+  // Achievement: first pick + start speed run timer
+  useEffect(() => {
+    if (componentsPicked === 1) {
+      unlock({ id: "first-pick", emoji: "🔧", title: "First Pick!", description: "You placed your first component." });
+      if (speedRunOn && !timerRunning && !buildSubmitted) {
+        setTimerRunning(true);
+        setBuildStartTime(Date.now());
+      }
+      if (buildStartTime === null) setBuildStartTime(Date.now());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [componentsPicked]);
+
+  // Achievement: budget hawk
+  useEffect(() => {
+    if (componentsPicked >= 4 && totalCost > 0 && totalCost <= BUDGET * 0.5) {
+      unlock({ id: "budget-hawk", emoji: "🦅", title: "Budget Hawk!", description: "Used less than 50% of your budget." });
+    }
+    if (componentsPicked >= 3 && totalPower > 0 && totalPower < 200) {
+      unlock({ id: "power-saver", emoji: "⚡", title: "Power Saver!", description: "Total power under 200W." });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalCost, totalPower, componentsPicked]);
+
+  // Speed Run countdown
+  useEffect(() => {
+    if (!timerRunning || buildSubmitted) return;
+    if (timeLeft <= 0) return;
+    const id = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
+    return () => clearTimeout(id);
+  }, [timerRunning, timeLeft, buildSubmitted]);
+
+  // Math Coach: log adds when components change
+  const prevPicked = useRef(0);
+  useEffect(() => {
+    if (componentsPicked === 0) {
+      prevPicked.current = 0;
+      setMathLog([]);
+      return;
+    }
+    if (componentsPicked === prevPicked.current) return;
+    const msg = `Total: $${totalCost.toLocaleString()} · Power: ${totalPower}W · Left: $${Math.max(0, budgetLeft).toLocaleString()}`;
+    setMathLog((prev) => [msg, ...prev].slice(0, 8));
+    prevPicked.current = componentsPicked;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [componentsPicked, totalCost, totalPower]);
+
   const handleQuizAnswer = (ansIdx: number) => {
     if (showExplanation) return;
     setSelectedAnswer(ansIdx);
@@ -209,6 +409,15 @@ export default function DemoPage() {
     setBuildSubmitted(false);
     setBuildScore(0);
     setBuildFeedback([]);
+    setBooting(false);
+    setBootResults([]);
+    setBootStep(0);
+    setBootComplete(false);
+    setMathLog([]);
+    setTimerRunning(false);
+    setTimeLeft(120);
+    setBuildStartTime(null);
+    setFinalBuildTime(null);
   };
 
   const switchChallenge = (ch: DemoChallenge) => {
@@ -216,39 +425,118 @@ export default function DemoPage() {
     resetBuild();
   };
 
-  const submitBuild = () => {
-    let score = 0;
-    const feedback: string[] = [];
-
-    if (totalCost <= BUDGET) { score += 30; feedback.push("Within budget! Great job managing costs."); }
-    else { feedback.push("Over budget! You need to cut costs."); }
-
-    if (selectedCPU) { score += 15; } else { feedback.push("You need a CPU!"); }
-    if (selectedRAM.length > 0) { score += 10; } else { feedback.push("Add some RAM!"); }
-    if (selectedStorage.length > 0) { score += 10; } else { feedback.push("Add storage!"); }
-    if (selectedPSU) {
-      if (selectedPSU.wattage >= totalPower) { score += 15; feedback.push("PSU handles the power draw. Smart!"); }
-      else { score += 5; feedback.push("PSU wattage is too low for your components!"); }
-    } else { feedback.push("Don't forget the power supply!"); }
-    if (selectedNIC) { score += 5; }
-
-    const cpuCores = selectedCPU?.cores ?? 0;
+  const runBootSequence = (onDone: (success: boolean) => void) => {
     const totalRAM = selectedRAM.reduce((s, r) => s + r.capacity, 0);
     const totalStor = selectedStorage.reduce((s, d) => s + d.capacity, 0);
-    if (cpuCores >= challengeWorkload.requiredCPUCores && totalRAM >= challengeWorkload.requiredRAM && totalStor >= challengeWorkload.requiredStorage) {
-      score += 15;
-      feedback.push(`Build meets ${challengeWorkload.name} requirements!`);
-    } else {
-      feedback.push(`Build doesn't fully meet ${challengeWorkload.name} needs.`);
-    }
+    const steps: { label: string; status: "ok" | "fail" | "skip"; detail: string }[] = [
+      selectedCPU
+        ? { label: "Checking CPU", status: "ok", detail: `${selectedCPU.cores} cores, ${selectedCPU.clockSpeed}GHz` }
+        : { label: "Checking CPU", status: "fail", detail: "No CPU found!" },
+      selectedRAM.length > 0
+        ? { label: "Loading RAM", status: "ok", detail: `${totalRAM}GB loaded` }
+        : { label: "Loading RAM", status: "fail", detail: "No RAM installed" },
+      selectedStorage.length > 0
+        ? { label: "Mounting Storage", status: "ok", detail: `${totalStor}TB ready` }
+        : { label: "Mounting Storage", status: "fail", detail: "No storage!" },
+      selectedGPU
+        ? { label: "GPU Scan", status: "ok", detail: `${selectedGPU.name} (${selectedGPU.vram}GB VRAM)` }
+        : challengeWorkload.requiredGPU
+          ? { label: "GPU Scan", status: "fail", detail: "Workload requires GPU!" }
+          : { label: "GPU Scan", status: "skip", detail: "Not installed" },
+      selectedNIC
+        ? { label: "Network Interface", status: "ok", detail: `${selectedNIC.speed} Gbps ready` }
+        : { label: "Network Interface", status: "fail", detail: "No NIC" },
+      selectedPSU
+        ? selectedPSU.wattage >= totalPower
+          ? { label: "Power Supply Test", status: "ok", detail: `${selectedPSU.wattage}W OK` }
+          : { label: "Power Supply Test", status: "fail", detail: "OVERLOAD!" }
+        : { label: "Power Supply Test", status: "fail", detail: "No PSU" },
+    ];
 
-    setBuildScore(score);
-    setBuildFeedback(feedback);
-    setBuildSubmitted(true);
+    setBootResults([]);
+    setBootStep(0);
+    setBootComplete(false);
+    setBooting(true);
+
+    let i = 0;
+    const tick = () => {
+      if (i >= steps.length) {
+        const success = !steps.some((s) => s.status === "fail");
+        setBootComplete(true);
+        setBootSuccess(success);
+        setTimeout(() => onDone(success), 1200);
+        return;
+      }
+      setBootResults((prev) => [...prev, steps[i]]);
+      setBootStep(i + 1);
+      i++;
+      setTimeout(tick, 500);
+    };
+    tick();
+  };
+
+  const submitBuild = () => {
+    setTimerRunning(false);
+    const elapsed = buildStartTime ? Math.floor((Date.now() - buildStartTime) / 1000) : null;
+    setFinalBuildTime(elapsed);
+
+    runBootSequence((bootOk) => {
+      let score = 0;
+      const feedback: string[] = [];
+
+      if (totalCost <= BUDGET) { score += 30; feedback.push("Within budget! Great job managing costs."); }
+      else { feedback.push("Over budget! You need to cut costs."); }
+
+      if (selectedCPU) { score += 15; } else { feedback.push("You need a CPU!"); }
+      if (selectedRAM.length > 0) { score += 10; } else { feedback.push("Add some RAM!"); }
+      if (selectedStorage.length > 0) { score += 10; } else { feedback.push("Add storage!"); }
+      if (selectedPSU) {
+        if (selectedPSU.wattage >= totalPower) { score += 15; feedback.push("PSU handles the power draw. Smart!"); }
+        else { score += 5; feedback.push("PSU wattage is too low for your components!"); }
+      } else { feedback.push("Don't forget the power supply!"); }
+      if (selectedNIC) { score += 5; }
+
+      const cpuCores = selectedCPU?.cores ?? 0;
+      const totalRAM = selectedRAM.reduce((s, r) => s + r.capacity, 0);
+      const totalStor = selectedStorage.reduce((s, d) => s + d.capacity, 0);
+      const meetsReqs = cpuCores >= challengeWorkload.requiredCPUCores && totalRAM >= challengeWorkload.requiredRAM && totalStor >= challengeWorkload.requiredStorage;
+      if (meetsReqs) {
+        score += 15;
+        feedback.push(`Build meets ${challengeWorkload.name} requirements!`);
+      } else {
+        feedback.push(`Build doesn't fully meet ${challengeWorkload.name} needs.`);
+      }
+
+      // Speed run bonus
+      if (speedRunOn && elapsed !== null && bootOk) {
+        if (elapsed < 60) { score = Math.round(score * 2); feedback.push(`Speed Run x2! Built in ${elapsed}s.`); }
+        else if (elapsed < 90) { score = Math.round(score * 1.5); feedback.push(`Speed Run x1.5! Built in ${elapsed}s.`); }
+      }
+
+      // Achievements on submit
+      if (elapsed !== null && elapsed < 60 && bootOk) {
+        unlock({ id: "speed-build", emoji: "🏎️", title: "Speed Build!", description: "Finished in under 60 seconds!" });
+      }
+      if (score >= 80) {
+        unlock({ id: "champion", emoji: "🌟", title: "Challenge Champion!", description: "Scored 80+ on a build!" });
+      }
+      if (meetsReqs && cpuCores >= challengeWorkload.requiredCPUCores * 2 && totalRAM >= challengeWorkload.requiredRAM * 2) {
+        unlock({ id: "overkill", emoji: "💪", title: "Overkill!", description: "Doubled the required specs." });
+      }
+      if (meetsReqs && cpuCores < challengeWorkload.requiredCPUCores * 1.5 && totalRAM < challengeWorkload.requiredRAM * 1.5) {
+        unlock({ id: "perfect-match", emoji: "🎯", title: "Perfect Match!", description: "Specs dialed in just right." });
+      }
+
+      setBuildScore(score);
+      setBuildFeedback(feedback);
+      setBuildSubmitted(true);
+      setBooting(false);
+    });
   };
 
   return (
     <div className="min-h-screen bg-slate-900">
+      <AchievementToast achievements={achievements} />
       {/* Demo Banner */}
       <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-black text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2">
         <Sparkles className="w-4 h-4" />
@@ -272,7 +560,7 @@ export default function DemoPage() {
         </div>
         {/* Tabs */}
         <div className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
-          {([["learn", BookOpen, "Learn"], ["workloads", Globe, "Workloads"], ["quiz", Star, "Quiz"], ["build", Gamepad2, "Build"]] as const).map(([key, Icon, label]) => (
+          {([["learn", BookOpen, "Learn"], ["workloads", Globe, "Workloads"], ["quiz", Star, "Quiz"], ["build", Gamepad2, "Build"], ["dojo", Calculator, "Math Dojo"]] as const).map(([key, Icon, label]) => (
             <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === key ? "border-emerald-500 text-emerald-400" : "border-transparent text-slate-400 hover:text-white"}`}>
               <Icon className="w-4 h-4" />{label}
             </button>
@@ -428,6 +716,70 @@ export default function DemoPage() {
               </div>
             ))}
 
+            {/* Personality Quiz */}
+            <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/30 border border-purple-500/30 rounded-xl p-5">
+              <h3 className="text-white font-bold mb-2 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-400" /> Which Workload Are You?
+              </h3>
+              {pqStep === -1 && pqResult === null && (
+                <>
+                  <p className="text-slate-300 text-sm mb-4">Take this 5-question quiz to find out what kind of data center engineer you are!</p>
+                  <button onClick={() => { setPqStep(0); setPqAnswers([]); setPqResult(null); }}
+                    className="bg-purple-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-400">
+                    Start the Quiz →
+                  </button>
+                </>
+              )}
+              {pqStep >= 0 && pqStep < personalityQs.length && (
+                <div>
+                  <div className="text-xs text-slate-400 mb-2">Question {pqStep + 1} of {personalityQs.length}</div>
+                  <h4 className="text-white font-bold mb-3">{personalityQs[pqStep].q}</h4>
+                  <div className="space-y-2">
+                    {personalityQs[pqStep].opts.map((opt, i) => (
+                      <button key={i}
+                        onClick={() => {
+                          const newAns = [...pqAnswers, opt.maps];
+                          if (pqStep + 1 >= personalityQs.length) {
+                            const counts: Record<string, number> = {};
+                            for (const a of newAns) counts[a] = (counts[a] ?? 0) + 1;
+                            const winner = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] as WorkloadKey;
+                            setPqResult(winner);
+                            setPqStep(-1);
+                          } else {
+                            setPqAnswers(newAns);
+                            setPqStep(pqStep + 1);
+                          }
+                        }}
+                        className="w-full text-left p-3 rounded-lg border border-slate-600 hover:border-purple-500 hover:bg-purple-500/10 transition-colors text-white">
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {pqResult && (
+                <div className="animate-slide-in text-center">
+                  <div className="text-6xl mb-2">{personalityResults[pqResult].emoji}</div>
+                  <h4 className="text-2xl font-bold text-purple-300 mb-2">You are a {personalityResults[pqResult].title}!</h4>
+                  <p className="text-slate-300 text-sm mb-4">{personalityResults[pqResult].desc}</p>
+                  <div className="flex gap-2 justify-center">
+                    <button onClick={() => { setPqResult(null); setPqStep(-1); setPqAnswers([]); }}
+                      className="bg-slate-700 text-white py-2 px-4 rounded-lg hover:bg-slate-600 text-sm">
+                      Retake Quiz
+                    </button>
+                    <button onClick={() => {
+                        const challengeId = personalityResults[pqResult].challengeId;
+                        const ch = demoChallenges.find(c => c.id === challengeId);
+                        if (ch) { switchChallenge(ch); setTab("build"); }
+                      }}
+                      className="bg-purple-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-400 text-sm">
+                      Build for this workload →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Cloud Economics Info Box */}
             <div className="bg-gradient-to-r from-slate-800 to-slate-700 border border-slate-600 rounded-xl p-5">
               <h3 className="text-white font-bold mb-2 flex items-center gap-2"><Cloud className="w-5 h-5 text-blue-400" /> Cloud Economics 101</h3>
@@ -505,6 +857,25 @@ export default function DemoPage() {
         {/* BUILD TAB */}
         {tab === "build" && (
           <div className="animate-slide-in">
+            {/* Speed Run Toggle + Timer */}
+            <div className="flex items-center justify-between bg-slate-800 border border-slate-700 rounded-xl p-3 mb-4">
+              <button
+                onClick={() => { setSpeedRunOn(!speedRunOn); setTimerRunning(false); setTimeLeft(120); }}
+                disabled={buildSubmitted}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-colors ${speedRunOn ? "bg-amber-500 text-black" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>
+                <Timer className="w-4 h-4" /> Speed Run {speedRunOn ? "ON" : "OFF"}
+              </button>
+              {speedRunOn && (
+                <div className={`flex items-center gap-2 font-mono font-bold text-2xl ${timeLeft > 60 ? "text-emerald-400" : timeLeft > 30 ? "text-amber-400" : "text-red-400"} ${timeLeft <= 10 && timerRunning ? "animate-timer-pulse" : ""}`}>
+                  <Timer className="w-6 h-6" />
+                  {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+                </div>
+              )}
+              {speedRunOn && !timerRunning && !buildSubmitted && componentsPicked === 0 && (
+                <span className="text-slate-400 text-xs">Timer starts on first pick</span>
+              )}
+            </div>
+
             {/* Challenge Selector */}
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-4">
               <h3 className="text-white font-bold mb-3">Choose Your Challenge</h3>
@@ -562,7 +933,67 @@ export default function DemoPage() {
               </div>
             </div>
 
-            {!buildSubmitted ? (
+            {/* Visual Motherboard Diagram */}
+            {!buildSubmitted && !booting && (
+              <div className="bg-gradient-to-br from-emerald-950/40 to-slate-900 border-2 border-emerald-700/40 rounded-xl p-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-bold flex items-center gap-2">🔧 Your Motherboard</h3>
+                  <span className="text-emerald-400 text-xs font-mono">{componentsPicked} / 11 slots filled</span>
+                </div>
+                <div className="grid grid-cols-6 gap-2">
+                  {/* Row 1: GPU (span 3) | NIC (span 2) | empty (1) */}
+                  <MoboSlot label="GPU Slot" filled={!!selectedGPU} name={selectedGPU?.name} colSpan={3} height="h-16" onClear={() => setSelectedGPU(null)} color="purple" />
+                  <MoboSlot label="NIC" filled={!!selectedNIC} name={selectedNIC?.name} colSpan={2} height="h-16" onClear={() => setSelectedNIC(null)} color="cyan" />
+                  <div className="col-span-1 flex items-center justify-center text-slate-700 text-xs">◦◦◦</div>
+                  {/* Row 2: CPU (span 3) | RAM x4 (each span 1 but stacked - use simpler layout) */}
+                  <MoboSlot label="CPU Socket" filled={!!selectedCPU} name={selectedCPU?.name} colSpan={3} height="h-20" onClear={() => setSelectedCPU(null)} color="blue" big />
+                  <MoboSlot label="RAM 1" filled={selectedRAM.length >= 1} name={selectedRAM[0]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 0))} color="emerald" vert />
+                  <MoboSlot label="RAM 2" filled={selectedRAM.length >= 2} name={selectedRAM[1]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 1))} color="emerald" vert />
+                  <MoboSlot label="RAM 3" filled={selectedRAM.length >= 3} name={selectedRAM[2]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 2))} color="emerald" vert />
+                  {/* Row 3: RAM4 | Storage x4 | PSU */}
+                  <MoboSlot label="RAM 4" filled={selectedRAM.length >= 4} name={selectedRAM[3]?.name} colSpan={1} height="h-14" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 3))} color="emerald" />
+                  <MoboSlot label="Drive 1" filled={selectedStorage.length >= 1} name={selectedStorage[0]?.name} colSpan={1} height="h-14" onClear={() => setSelectedStorage((p) => p.filter((_, i) => i !== 0))} color="orange" />
+                  <MoboSlot label="Drive 2" filled={selectedStorage.length >= 2} name={selectedStorage[1]?.name} colSpan={1} height="h-14" onClear={() => setSelectedStorage((p) => p.filter((_, i) => i !== 1))} color="orange" />
+                  <MoboSlot label="Drive 3" filled={selectedStorage.length >= 3} name={selectedStorage[2]?.name} colSpan={1} height="h-14" onClear={() => setSelectedStorage((p) => p.filter((_, i) => i !== 2))} color="orange" />
+                  <MoboSlot label="Drive 4" filled={selectedStorage.length >= 4} name={selectedStorage[3]?.name} colSpan={1} height="h-14" onClear={() => setSelectedStorage((p) => p.filter((_, i) => i !== 3))} color="orange" />
+                  <MoboSlot label="PSU" filled={!!selectedPSU} name={selectedPSU?.name} colSpan={1} height="h-14" onClear={() => setSelectedPSU(null)} color="red" />
+                </div>
+              </div>
+            )}
+
+            {/* Boot Sequence Overlay */}
+            {booting && (
+              <div className="bg-black border-2 border-emerald-500 rounded-xl p-6 mb-4 font-mono">
+                <div className="flex items-center gap-2 mb-4 text-emerald-400">
+                  <Zap className="w-5 h-5 animate-pulse" />
+                  <span className="font-bold">SERVER BOOT SEQUENCE</span>
+                </div>
+                <div className="space-y-2 min-h-[200px]">
+                  {bootResults.map((r, i) => (
+                    <div key={i} className="flex items-center gap-3 text-sm animate-boot-check">
+                      <span className={`w-6 ${r.status === "ok" ? "text-emerald-400" : r.status === "fail" ? "text-red-400" : "text-slate-500"}`}>
+                        {r.status === "ok" ? "✓" : r.status === "fail" ? "✗" : "○"}
+                      </span>
+                      <span className="text-slate-300 w-44">{r.label}...</span>
+                      <span className={r.status === "ok" ? "text-emerald-400" : r.status === "fail" ? "text-red-400" : "text-slate-500"}>{r.detail}</span>
+                    </div>
+                  ))}
+                  {bootStep < 6 && (
+                    <div className="flex items-center gap-3 text-sm text-slate-500">
+                      <span className="w-6 animate-pulse">▸</span>
+                      <span>Scanning...</span>
+                    </div>
+                  )}
+                </div>
+                {bootComplete && (
+                  <div className={`mt-4 p-4 rounded-lg text-center text-2xl font-black ${bootSuccess ? "bg-emerald-900/50 text-emerald-300 animate-server-online" : "bg-red-900/50 text-red-300 animate-shake"}`}>
+                    {bootSuccess ? "🟢 SERVER ONLINE" : "🔴 BOOT FAILED"}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!buildSubmitted && !booting ? (
               <div className="grid lg:grid-cols-3 gap-4">
                 {/* Component Selection */}
                 <div className="lg:col-span-2 space-y-4">
@@ -665,20 +1096,53 @@ export default function DemoPage() {
                       )}
                     </div>
                     <button onClick={submitBuild} disabled={!selectedCPU} className="w-full mt-4 bg-emerald-500 text-white font-bold py-3 rounded-xl hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                      Submit Build
+                      Boot Server 🚀
                     </button>
                     <button onClick={resetBuild} className="w-full mt-2 bg-slate-700 text-slate-300 py-2 rounded-lg text-sm hover:bg-slate-600">
                       Reset Build
                     </button>
                   </div>
+
+                  {/* Live Math Coach */}
+                  <div className="bg-amber-950/30 border border-amber-700/40 rounded-xl mt-3 overflow-hidden">
+                    <button onClick={() => setMathLogOpen(!mathLogOpen)} className="w-full p-3 flex items-center justify-between text-left">
+                      <span className="text-amber-300 font-bold text-sm flex items-center gap-2">
+                        <Calculator className="w-4 h-4" /> Math Coach
+                      </span>
+                      {mathLogOpen ? <ChevronUp className="w-4 h-4 text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-400" />}
+                    </button>
+                    {mathLogOpen && (
+                      <div className="px-3 pb-3 space-y-1">
+                        {mathLog.length === 0 ? (
+                          <p className="text-amber-200/60 text-xs">Pick a component to see live math!</p>
+                        ) : (
+                          mathLog.map((m, i) => (
+                            <p key={i} className={`text-xs font-mono ${i === 0 ? "text-amber-200" : "text-amber-200/50"}`}>
+                              {i === 0 ? "▸ " : "  "}{m}
+                            </p>
+                          ))
+                        )}
+                        {componentsPicked >= 2 && budgetLeft >= 0 && (
+                          <p className="text-amber-300/80 text-xs mt-2 border-t border-amber-700/30 pt-2">
+                            💡 Vedic check: ${BUDGET.toLocaleString()} - ${totalCost.toLocaleString()} = ${budgetLeft.toLocaleString()} (subtract each digit from 9, last from 10)
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            ) : (
+            ) : buildSubmitted && !booting ? (
               /* Results */
-              <div className="max-w-lg mx-auto bg-slate-800 border border-slate-700 rounded-xl p-8 text-center">
+              <div className="max-w-lg mx-auto bg-slate-800 border border-slate-700 rounded-xl p-8 text-center animate-fade-in-up">
                 <Trophy className="w-16 h-16 text-amber-400 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-white mb-2">Build Complete!</h2>
-                <p className="text-5xl font-black text-emerald-400 mb-4">{buildScore}/100</p>
+                <p className="text-5xl font-black text-emerald-400 mb-2">{buildScore}/100</p>
+                {finalBuildTime !== null && speedRunOn && (
+                  <p className="text-amber-400 text-sm font-bold mb-4 flex items-center justify-center gap-2">
+                    <Timer className="w-4 h-4" /> Built in {finalBuildTime}s
+                  </p>
+                )}
                 <div className="flex justify-center mb-4">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star key={s} className={`w-6 h-6 ${s <= Math.ceil(buildScore / 20) ? "text-amber-400 fill-amber-400" : "text-slate-600"}`} />
@@ -731,16 +1195,64 @@ export default function DemoPage() {
                   )}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Vedic Math Tip */}
-            {!buildSubmitted && (
+            {!buildSubmitted && !booting && (
               <div className="vedic-card rounded-xl p-4 mt-4">
                 <h4 className="text-amber-200 font-bold mb-1">🧮 Vedic Math: Quick Budget Check</h4>
                 <p className="text-amber-100/80 text-sm">To check if you&apos;re within budget, subtract from ${BUDGET.toLocaleString()} using the Vedic method: subtract each digit from 9 (last from 10). Example: $5000 - $3,247 → 9-3=6, 9-2=7, 9-4=5, 10-7=3 → $1,753 remaining!</p>
               </div>
             )}
           </div>
+        )}
+
+        {/* MATH DOJO TAB */}
+        {tab === "dojo" && (
+          <MathDojo
+            started={dojoStarted} round={dojoRound} problem={dojoProblem} input={dojoInput}
+            score={dojoScore} streak={dojoStreak} timer={dojoTimer} feedback={dojoFeedback}
+            done={dojoDone}
+            onStart={() => {
+              setDojoStarted(true); setDojoRound(0); setDojoScore(0); setDojoStreak(0);
+              setDojoDone(false); setDojoFeedback(null); setDojoInput("");
+              setDojoProblem(generateMathProblem()); setDojoTimer(30); setDojoStartTime(Date.now());
+            }}
+            onInputChange={setDojoInput}
+            onSubmit={() => {
+              if (!dojoProblem || dojoFeedback) return;
+              const guess = parseFloat(dojoInput.replace(/[^\d.-]/g, ""));
+              const correct = Math.abs(guess - dojoProblem.answer) < 0.01;
+              const elapsed = (Date.now() - dojoStartTime) / 1000;
+              let gained = 0;
+              if (correct) {
+                gained = 100;
+                if (elapsed < 10) gained += 50;
+                const newStreak = dojoStreak + 1;
+                setDojoStreak(newStreak);
+                if (newStreak >= 3) gained *= 2;
+                unlock({ id: "vedic-apprentice", emoji: "🧮", title: "Vedic Apprentice!", description: "Solved your first problem!" });
+              } else {
+                setDojoStreak(0);
+              }
+              setDojoScore((s) => s + gained);
+              setDojoFeedback({ correct, explanation: dojoProblem.explanation, answer: dojoProblem.answer });
+            }}
+            onNext={() => {
+              if (dojoRound + 1 >= 10) {
+                setDojoDone(true);
+                return;
+              }
+              setDojoRound((r) => r + 1);
+              setDojoProblem(generateMathProblem());
+              setDojoInput(""); setDojoFeedback(null); setDojoTimer(30); setDojoStartTime(Date.now());
+            }}
+            onRestart={() => {
+              setDojoStarted(false); setDojoDone(false); setDojoRound(0);
+              setDojoScore(0); setDojoStreak(0); setDojoInput(""); setDojoFeedback(null);
+            }}
+            onTick={() => setDojoTimer((t) => Math.max(0, t - 1))}
+          />
         )}
       </div>
     </div>
@@ -805,6 +1317,146 @@ function ReqBar({ label, emoji, val, max, unit, why, color }: { label: string; e
         <span className="text-white text-xs font-bold w-16 text-right">{val} {unit}</span>
       </div>
       <p className="text-slate-500 text-xs ml-[92px]">{why}</p>
+    </div>
+  );
+}
+
+const colorClasses: Record<string, { border: string; bg: string; text: string }> = {
+  blue: { border: "border-blue-500", bg: "bg-blue-500/20", text: "text-blue-300" },
+  emerald: { border: "border-emerald-500", bg: "bg-emerald-500/20", text: "text-emerald-300" },
+  purple: { border: "border-purple-500", bg: "bg-purple-500/20", text: "text-purple-300" },
+  orange: { border: "border-orange-500", bg: "bg-orange-500/20", text: "text-orange-300" },
+  cyan: { border: "border-cyan-500", bg: "bg-cyan-500/20", text: "text-cyan-300" },
+  red: { border: "border-red-500", bg: "bg-red-500/20", text: "text-red-300" },
+};
+
+function MoboSlot({ label, filled, name, colSpan, height, onClear, color, big, vert }: {
+  label: string; filled: boolean; name?: string; colSpan: number; height: string;
+  onClear: () => void; color: string; big?: boolean; vert?: boolean;
+}) {
+  const c = colorClasses[color] ?? colorClasses.emerald;
+  const span = `col-span-${colSpan}`;
+  const spanClasses: Record<number, string> = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" };
+  return (
+    <button
+      onClick={filled ? onClear : undefined}
+      disabled={!filled}
+      className={`${spanClasses[colSpan] ?? span} ${height} rounded-lg border-2 flex items-center justify-center text-center px-2 transition-all ${
+        filled ? `${c.border} ${c.bg} ${c.text} cursor-pointer hover:brightness-125 animate-slot-fill` : "border-dashed border-slate-700 text-slate-600"
+      }`}
+    >
+      {filled ? (
+        <span className={`font-bold ${big ? "text-sm" : "text-[10px]"} ${vert ? "writing-vertical" : ""} line-clamp-2 leading-tight`}>
+          {name ?? label}
+        </span>
+      ) : (
+        <span className="text-[10px] font-medium">{label}</span>
+      )}
+    </button>
+  );
+}
+
+interface MathDojoProps {
+  started: boolean; round: number; problem: MathProblem | null; input: string;
+  score: number; streak: number; timer: number;
+  feedback: { correct: boolean; explanation: string; answer: number } | null;
+  done: boolean;
+  onStart: () => void; onInputChange: (v: string) => void; onSubmit: () => void;
+  onNext: () => void; onRestart: () => void; onTick: () => void;
+}
+
+function MathDojo(props: MathDojoProps) {
+  const { started, round, problem, input, score, streak, timer, feedback, done, onStart, onInputChange, onSubmit, onNext, onRestart, onTick } = props;
+
+  // Timer tick
+  useEffect(() => {
+    if (!started || feedback || done || timer <= 0) return;
+    const id = setTimeout(onTick, 1000);
+    return () => clearTimeout(id);
+  }, [started, feedback, done, timer, onTick]);
+
+  if (!started && !done) {
+    return (
+      <div className="max-w-xl mx-auto animate-slide-in">
+        <div className="bg-gradient-to-br from-amber-900/40 to-orange-900/30 border-2 border-amber-500/40 rounded-xl p-8 text-center">
+          <div className="text-6xl mb-4">🧮</div>
+          <h2 className="text-3xl font-black text-amber-300 mb-2">Vedic Math Dojo</h2>
+          <p className="text-amber-100/80 mb-2">10 rounds. Mental math only. Vedic shortcuts FTW.</p>
+          <p className="text-slate-400 text-sm mb-6">100 pts per correct answer · +50 speed bonus under 10s · 2x streak multiplier at 3+ in a row</p>
+          <button onClick={onStart} className="bg-amber-500 text-black font-black py-3 px-8 rounded-xl hover:bg-amber-400 text-lg">
+            Enter the Dojo →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (done) {
+    const r = rankFromScore(score);
+    return (
+      <div className="max-w-xl mx-auto animate-slide-in">
+        <div className="bg-slate-800 border border-amber-500/40 rounded-xl p-8 text-center">
+          <div className="text-6xl mb-2">{r.emoji}</div>
+          <h2 className="text-2xl font-bold text-white mb-2">You are a {r.rank}!</h2>
+          <p className="text-5xl font-black text-amber-400 mb-4">{score} pts</p>
+          <p className="text-slate-400 text-sm mb-6">
+            Ranks: Apprentice 🌱 (0-299) · Scholar 📚 (300-599) · Master 🏆 (600-899) · Grandmaster 👑 (900+)
+          </p>
+          <button onClick={onRestart} className="bg-amber-500 text-black font-bold py-2 px-6 rounded-lg hover:bg-amber-400">
+            Play Again →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-xl mx-auto animate-slide-in">
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+        <div className="flex justify-between items-center mb-3">
+          <span className="text-sm text-slate-400">Round {round + 1} / 10</span>
+          <div className="flex items-center gap-4">
+            {streak >= 2 && <span className="text-amber-400 text-sm font-bold">🔥 {streak} streak</span>}
+            <span className="text-emerald-400 text-sm font-bold">{score} pts</span>
+          </div>
+        </div>
+        <div className="w-full bg-slate-700 rounded-full h-2 mb-4">
+          <div className={`h-2 rounded-full transition-all ${timer > 15 ? "bg-emerald-500" : timer > 5 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${(timer / 30) * 100}%` }} />
+        </div>
+
+        <h3 className="text-2xl font-bold text-white mb-2 text-center">{problem?.question}</h3>
+        <p className="text-amber-300/70 text-xs text-center mb-4">{problem?.hint}</p>
+
+        {!feedback ? (
+          <>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={input}
+              onChange={(e) => onInputChange(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+              placeholder="Your answer"
+              autoFocus
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-center text-2xl font-mono mb-3 focus:border-amber-500 focus:outline-none"
+            />
+            <button onClick={onSubmit} disabled={!input} className="w-full bg-amber-500 text-black font-bold py-3 rounded-xl hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed">
+              Submit Answer
+            </button>
+          </>
+        ) : (
+          <div className="animate-fade-in-up">
+            <div className={`p-4 rounded-lg mb-3 ${feedback.correct ? "bg-emerald-500/10 border border-emerald-500/40" : "bg-red-500/10 border border-red-500/40"}`}>
+              <p className={`font-bold mb-1 ${feedback.correct ? "text-emerald-300" : "text-red-300"}`}>
+                {feedback.correct ? "✅ Correct!" : `❌ Not quite. Answer: ${feedback.answer}`}
+              </p>
+              <pre className="text-slate-300 text-xs whitespace-pre-wrap font-mono">{feedback.explanation}</pre>
+            </div>
+            <button onClick={onNext} className="w-full bg-emerald-500 text-white font-bold py-3 rounded-xl hover:bg-emerald-400">
+              {round + 1 >= 10 ? "See Results →" : "Next Problem →"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
