@@ -6,14 +6,12 @@ import { quizQuestions } from "@/lib/data/challenges";
 import { workloads } from "@/lib/data/workloads";
 import type { CPUSpec, RAMSpec, StorageSpec, GPUSpec, NetworkCard, PowerSupply } from "@/lib/types";
 import {
-  Cpu, MemoryStick, HardDrive, Monitor, Network, Battery,
-  BookOpen, Gamepad2, Trophy, Star, Check, X,
-  ChevronDown, ChevronUp, Zap, ArrowRight, Lock, Sparkles,
+  Cpu, BookOpen, Gamepad2, Trophy, Star, Check, X,
+  ChevronDown, ChevronUp, Lock, Sparkles, Globe, Cloud,
 } from "lucide-react";
 import Link from "next/link";
 
-const BUDGET = 5000;
-
+// ─── Component Learning Data ───
 const componentInfo = [
   { emoji: "🧠", name: "CPU", analogy: "The Brain", desc: "The CPU (Central Processing Unit) is the brain of the computer. It processes all instructions and calculations. More cores = more tasks at once! Clock speed (GHz) = how fast it thinks.", specs: ["Cores", "Clock Speed (GHz)", "TDP (Watts)", "Best For"] },
   { emoji: "📋", name: "RAM", analogy: "The Desk", desc: "RAM (Random Access Memory) is like your desk space. More RAM = bigger desk = more things open at once! It's super fast but forgets everything when power goes off.", specs: ["Capacity (GB)", "Type (DDR4/DDR5)", "Speed (MHz)"] },
@@ -23,9 +21,119 @@ const componentInfo = [
   { emoji: "❤️", name: "Power Supply", analogy: "The Heart", desc: "The PSU (Power Supply Unit) converts wall power into the exact voltages your components need. Efficiency ratings (80+ Bronze/Gold/Platinum) tell you how little energy is wasted as heat.", specs: ["Wattage", "Efficiency Rating"] },
 ];
 
+// ─── Workload Education Data (with AWS/Azure mappings) ───
+const workloadEducation = [
+  {
+    id: "web", icon: "🌐", name: "Web Hosting", color: "from-emerald-800/40 to-emerald-900/20", borderColor: "border-emerald-500/30",
+    description: "When you type a website address, a server sends you the page. Every website — from your school's homepage to Amazon — lives on a server somewhere!",
+    realWorld: "When 1,000 kids all visit the school website to check snow day announcements at the same time, the web server needs to handle all of them without crashing!",
+    whyNeeds: {
+      cpu: { val: 4, max: 64, why: "Like a cashier — you need enough to handle multiple customers, but web pages are simple to serve" },
+      ram: { val: 16, max: 128, why: "Each visitor's page is held in memory while they browse — more visitors = more RAM" },
+      storage: { val: 1, max: 8, why: "Website files, images, and code don't take much space" },
+      gpu: { needed: false, why: "Web pages are text and images — no heavy graphics processing needed" },
+      network: { val: 10, max: 100, why: "Sending web pages to thousands of people needs a fast highway" },
+    },
+    revenue: 2000,
+    aws: { sku: "t3.xlarge", cost: "$0.17/hr (~$120/mo)", note: "The 't' stands for 'burstable' — it speeds up when traffic spikes!" },
+    azure: { sku: "B4ms", cost: "$0.17/hr (~$120/mo)", note: "The 'B' series is for bursty workloads like websites that get traffic waves." },
+  },
+  {
+    id: "game", icon: "🎮", name: "Game Servers", color: "from-purple-800/40 to-purple-900/20", borderColor: "border-purple-500/30",
+    description: "Multiplayer games like Fortnite, Minecraft, and Roblox all run on servers. The server tracks every player's position, health, inventory, and actions — hundreds of times per second!",
+    realWorld: "Imagine 100 kids playing Minecraft on the same world. The server has to calculate every block placed, every creeper explosion, every arrow shot — all in real-time with zero lag!",
+    whyNeeds: {
+      cpu: { val: 8, max: 64, why: "Game physics and player calculations need fast single-thread performance. Each game 'tick' must finish in milliseconds" },
+      ram: { val: 32, max: 128, why: "Every player's state, the entire map, and all entities live in memory. More players = more RAM" },
+      storage: { val: 2, max: 8, why: "World saves, player data, and game assets" },
+      gpu: { needed: true, vram: 8, why: "Some games do server-side rendering or AI pathfinding on GPU" },
+      network: { val: 10, max: 100, why: "Low latency is KING. Even 50ms of lag = players complaining about 'lag spikes'" },
+    },
+    revenue: 5000,
+    aws: { sku: "g4dn.xlarge", cost: "$0.53/hr (~$380/mo)", note: "The 'g' means GPU-powered. Designed for game streaming!" },
+    azure: { sku: "NCas_T4_v3", cost: "$0.53/hr (~$380/mo)", note: "Uses NVIDIA T4 GPUs built for gaming and graphics." },
+  },
+  {
+    id: "video", icon: "🎬", name: "Video Streaming", color: "from-red-800/40 to-red-900/20", borderColor: "border-red-500/30",
+    description: "Netflix, YouTube, and TikTok serve BILLIONS of hours of video every day. The server stores videos, converts them to different qualities (4K, 1080p, 720p), and streams them to your device.",
+    realWorld: "When a new Marvel movie drops on Disney+, millions of people hit play at the same time. The servers must encode the video into 20+ different formats and deliver them to phones, tablets, TVs, and laptops — all without buffering!",
+    whyNeeds: {
+      cpu: { val: 16, max: 64, why: "Encoding video from one format to another is CPU-intensive work" },
+      ram: { val: 64, max: 128, why: "Buffering video chunks in memory for fast delivery" },
+      storage: { val: 8, max: 8, why: "A single 4K movie is 100 GB. Libraries have thousands of titles!" },
+      gpu: { needed: true, vram: 6, why: "Hardware video encoding is MUCH faster than CPU encoding" },
+      network: { val: 100, max: 100, why: "This is the big one! Streaming video to millions = massive bandwidth" },
+    },
+    revenue: 8000,
+    aws: { sku: "c6i.4xlarge", cost: "$0.68/hr (~$490/mo)", note: "Compute-optimized. Plus S3 storage at $0.023/GB/mo. AWS CloudFront CDN caches videos closer to viewers." },
+    azure: { sku: "Fsv2 series", cost: "$0.68/hr (~$490/mo)", note: "Optimized for high CPU throughput. Azure Media Services handles encoding automatically." },
+  },
+  {
+    id: "db", icon: "🗄️", name: "Database", color: "from-blue-800/40 to-blue-900/20", borderColor: "border-blue-500/30",
+    description: "Every app has a database behind it. When you log into Instagram, it checks your username and password in a database. When you post a photo, it saves the metadata. EVERYTHING is data.",
+    realWorld: "A bank's database handles millions of transactions per second. If someone sends you $20 on Venmo, the database must INSTANTLY deduct from their account and add to yours — and never, ever make a mistake!",
+    whyNeeds: {
+      cpu: { val: 16, max: 64, why: "Sorting, searching, joining, and filtering millions of records requires serious compute" },
+      ram: { val: 64, max: 128, why: "THE most important thing! Databases cache frequently-used data in RAM because it's 1000x faster than disk" },
+      storage: { val: 4, max: 8, why: "All the actual data lives here. NVMe SSDs are preferred for speed" },
+      gpu: { needed: false, why: "Database queries are sequential logic, not parallel math — no GPU needed" },
+      network: { val: 10, max: 100, why: "Applications constantly read/write to the database" },
+    },
+    revenue: 6000,
+    aws: { sku: "r6i.2xlarge", cost: "$0.50/hr (~$365/mo)", note: "The 'r' = memory-optimized. Or use RDS for managed databases — AWS handles backups and scaling!" },
+    azure: { sku: "E4as_v5", cost: "$0.50/hr (~$365/mo)", note: "The 'E' series = memory-optimized. Azure SQL Database is the managed option." },
+  },
+  {
+    id: "ai", icon: "🧠", name: "AI Training", color: "from-amber-800/40 to-amber-900/20", borderColor: "border-amber-500/30",
+    description: "This is how ChatGPT, image generators, and self-driving cars learn! AI training feeds millions of examples through a neural network, adjusting millions of parameters until the AI gets smart.",
+    realWorld: "Teaching an AI to recognize cats in photos means showing it 10 MILLION cat pictures. Each picture runs through billions of calculations. This can take WEEKS on a single computer — or hours on a GPU cluster!",
+    whyNeeds: {
+      cpu: { val: 32, max: 64, why: "Prepares data, manages training pipeline, handles I/O. Think of it as the project manager" },
+      ram: { val: 128, max: 128, why: "Loading huge datasets into memory — ImageNet alone is 150 GB!" },
+      storage: { val: 4, max: 8, why: "Training datasets, model checkpoints, logs" },
+      gpu: { needed: true, vram: 40, why: "THE most important component! GPUs do matrix math 100x faster than CPUs. More VRAM = bigger models" },
+      network: { val: 25, max: 100, why: "When training across multiple servers, they need to share gradient updates FAST" },
+    },
+    revenue: 15000,
+    aws: { sku: "p4d.24xlarge", cost: "$32.77/hr (~$24K/mo)", note: "Has 8 NVIDIA A100 GPUs! This is what companies use to train GPT-class models." },
+    azure: { sku: "ND A100 v4", cost: "$27.20/hr (~$20K/mo)", note: "Microsoft uses these internally for Copilot and Bing AI!" },
+  },
+];
+
+// ─── Build Challenges (mapped to workloads + cloud SKUs) ───
+interface DemoChallenge {
+  id: string; name: string; scenario: string; difficulty: number; budget: number;
+  workloadId: string; // maps to workloads array by id
+  cloudEquiv: string;
+}
+
+const demoChallenges: DemoChallenge[] = [
+  { id: "ch1", name: "School Website Server", difficulty: 1, budget: 2000,
+    workloadId: "wl-web",
+    scenario: "Bothell Middle School needs a server for their website. 500 students check it daily for homework and announcements. Build a motherboard that can handle it!",
+    cloudEquiv: "AWS t3.xlarge (~$120/mo) or Azure B4ms (~$120/mo)" },
+  { id: "ch2", name: "Minecraft Server", difficulty: 2, budget: 3000,
+    workloadId: "wl-game",
+    scenario: "MathCodeLab wants to host a Minecraft server for 50 players. Build a rig that keeps the game running smooth at 20 TPS with zero lag!",
+    cloudEquiv: "AWS g4dn.xlarge (~$380/mo) or Azure NCas_T4_v3 (~$380/mo)" },
+  { id: "ch3", name: "YouTube for Pets", difficulty: 3, budget: 3500,
+    workloadId: "wl-video",
+    scenario: "A startup is launching 'PetTube' — a video streaming site just for funny pet videos. They need to serve 1080p video to 10,000 viewers at once!",
+    cloudEquiv: "AWS c6i.4xlarge (~$490/mo) or Azure Fsv2 (~$490/mo)" },
+  { id: "ch4", name: "Bank Database", difficulty: 4, budget: 4000,
+    workloadId: "wl-db",
+    scenario: "KidBank, a banking app for kids' allowances, needs a bulletproof database. Handle 50,000 transactions per hour and NEVER lose a penny!",
+    cloudEquiv: "AWS r6i.2xlarge (~$365/mo) or Azure E4as_v5 (~$365/mo)" },
+  { id: "ch5", name: "Train an AI", difficulty: 5, budget: 40000,
+    workloadId: "wl-ai",
+    scenario: "A research lab wants to train an AI that identifies diseases in X-ray images. This will save lives — but it needs SERIOUS GPU power!",
+    cloudEquiv: "AWS p4d.24xlarge (~$24K/mo) or Azure ND A100 v4 (~$20K/mo)" },
+];
+
 export default function DemoPage() {
-  const [tab, setTab] = useState<"learn" | "quiz" | "build">("learn");
+  const [tab, setTab] = useState<"learn" | "workloads" | "quiz" | "build">("learn");
   const [expandedComponent, setExpandedComponent] = useState<number | null>(null);
+  const [expandedWorkload, setExpandedWorkload] = useState<number | null>(null);
 
   // Quiz state
   const [quizIdx, setQuizIdx] = useState(0);
@@ -35,6 +143,7 @@ export default function DemoPage() {
   const [showExplanation, setShowExplanation] = useState(false);
 
   // Build state — local, no store needed
+  const [selectedChallenge, setSelectedChallenge] = useState<DemoChallenge>(demoChallenges[0]);
   const [selectedCPU, setSelectedCPU] = useState<CPUSpec | null>(null);
   const [selectedRAM, setSelectedRAM] = useState<RAMSpec[]>([]);
   const [selectedStorage, setSelectedStorage] = useState<StorageSpec[]>([]);
@@ -44,9 +153,11 @@ export default function DemoPage() {
   const [buildSubmitted, setBuildSubmitted] = useState(false);
   const [buildScore, setBuildScore] = useState(0);
   const [buildFeedback, setBuildFeedback] = useState<string[]>([]);
-  const [challengeWorkload] = useState(() => workloads[0]); // always Web Hosting for demo
 
+  const challengeWorkload = useMemo(() => workloads.find(w => w.id === selectedChallenge.workloadId) ?? workloads[0], [selectedChallenge]);
   const questions = quizQuestions[1] || [];
+
+  const BUDGET = selectedChallenge.budget;
 
   const totalCost = useMemo(() => {
     let c = 0;
@@ -96,6 +207,13 @@ export default function DemoPage() {
     setSelectedNIC(null);
     setSelectedPSU(null);
     setBuildSubmitted(false);
+    setBuildScore(0);
+    setBuildFeedback([]);
+  };
+
+  const switchChallenge = (ch: DemoChallenge) => {
+    setSelectedChallenge(ch);
+    resetBuild();
   };
 
   const submitBuild = () => {
@@ -153,9 +271,9 @@ export default function DemoPage() {
           <Link href="/" className="text-slate-400 hover:text-white text-sm">← Home</Link>
         </div>
         {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-4 flex gap-1">
-          {([["learn", BookOpen, "Learn"], ["quiz", Star, "Quiz"], ["build", Gamepad2, "Build"]] as const).map(([key, Icon, label]) => (
-            <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${tab === key ? "border-emerald-500 text-emerald-400" : "border-transparent text-slate-400 hover:text-white"}`}>
+        <div className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
+          {([["learn", BookOpen, "Learn"], ["workloads", Globe, "Workloads"], ["quiz", Star, "Quiz"], ["build", Gamepad2, "Build"]] as const).map(([key, Icon, label]) => (
+            <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === key ? "border-emerald-500 text-emerald-400" : "border-transparent text-slate-400 hover:text-white"}`}>
               <Icon className="w-4 h-4" />{label}
             </button>
           ))}
@@ -194,6 +312,128 @@ export default function DemoPage() {
                 )}
               </div>
             ))}
+
+            {/* How It All Connects */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4">How It All Connects 🔗</h3>
+              <div className="grid grid-cols-6 gap-2 text-center text-xs">
+                <div className="col-span-2 bg-blue-900/50 border border-blue-500/30 rounded-lg p-3">
+                  <div className="text-2xl mb-1">🧠</div><span className="text-blue-400 font-bold">CPU</span>
+                  <div className="text-slate-500 mt-1">Processes everything</div>
+                </div>
+                <div className="col-span-2 bg-purple-900/50 border border-purple-500/30 rounded-lg p-3">
+                  <div className="text-2xl mb-1">🎨</div><span className="text-purple-400 font-bold">GPU</span>
+                  <div className="text-slate-500 mt-1">Parallel math</div>
+                </div>
+                <div className="col-span-2 bg-cyan-900/50 border border-cyan-500/30 rounded-lg p-3">
+                  <div className="text-2xl mb-1">🛣️</div><span className="text-cyan-400 font-bold">Network</span>
+                  <div className="text-slate-500 mt-1">Talks to internet</div>
+                </div>
+                <div className="col-span-3 bg-emerald-900/50 border border-emerald-500/30 rounded-lg p-3">
+                  <div className="text-2xl mb-1">📋📋📋📋</div><span className="text-emerald-400 font-bold">4 RAM Slots</span>
+                  <div className="text-slate-500 mt-1">Fast temporary memory</div>
+                </div>
+                <div className="col-span-3 bg-orange-900/50 border border-orange-500/30 rounded-lg p-3">
+                  <div className="text-2xl mb-1">🗄️🗄️🗄️🗄️</div><span className="text-orange-400 font-bold">4 Storage Bays</span>
+                  <div className="text-slate-500 mt-1">Permanent data</div>
+                </div>
+                <div className="col-span-6 bg-red-900/50 border border-red-500/30 rounded-lg p-2">
+                  <span className="text-red-400 font-bold">❤️ Power Supply — feeds electricity to ALL components above</span>
+                </div>
+              </div>
+              <p className="text-slate-400 text-xs mt-3 text-center">All these components plug into the motherboard, which connects them with tiny copper traces (like roads in a city!)</p>
+            </div>
+
+            <button onClick={() => setTab("workloads")} className="w-full bg-emerald-500 text-white font-bold py-3 rounded-xl hover:bg-emerald-400 transition-colors">
+              Next: What Do Data Centers Actually Do? →
+            </button>
+          </div>
+        )}
+
+        {/* WORKLOADS TAB */}
+        {tab === "workloads" && (
+          <div className="space-y-4 animate-slide-in">
+            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/20 rounded-xl p-6">
+              <h2 className="text-2xl font-bold text-white mb-3">What Do Data Centers Actually DO? 🌍</h2>
+              <p className="text-slate-300 mb-2">Every time you watch YouTube, play Fortnite, ask ChatGPT a question, or even send a text — a data center is working behind the scenes.</p>
+              <p className="text-slate-300">But different jobs need different hardware. Let&apos;s explore what these &quot;workloads&quot; are and what they need!</p>
+            </div>
+
+            {workloadEducation.map((wl, i) => (
+              <div key={wl.id} className={`bg-gradient-to-r ${wl.color} border ${wl.borderColor} rounded-xl overflow-hidden card-hover`}>
+                <button onClick={() => setExpandedWorkload(expandedWorkload === i ? null : i)} className="w-full flex items-center gap-4 p-4 text-left">
+                  <div className="w-14 h-14 rounded-xl bg-slate-700/80 flex items-center justify-center text-3xl flex-shrink-0">{wl.icon}</div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-white">{wl.name}</h3>
+                    <p className="text-sm text-slate-300 line-clamp-1">{wl.description}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className="text-emerald-400 text-sm font-bold">${wl.revenue.toLocaleString()}/mo</span>
+                    <div className="text-slate-500 text-xs">revenue</div>
+                  </div>
+                  {expandedWorkload === i ? <ChevronUp className="w-5 h-5 text-slate-400 flex-shrink-0" /> : <ChevronDown className="w-5 h-5 text-slate-400 flex-shrink-0" />}
+                </button>
+                {expandedWorkload === i && (
+                  <div className="px-4 pb-4 border-t border-slate-700/50 pt-4 animate-slide-in space-y-4">
+                    <p className="text-slate-300 text-sm">{wl.description}</p>
+
+                    {/* Real World Example */}
+                    <div className="bg-slate-800/50 rounded-lg p-3">
+                      <h4 className="text-amber-400 font-bold text-sm mb-1">📖 Real World Example</h4>
+                      <p className="text-slate-300 text-sm">{wl.realWorld}</p>
+                    </div>
+
+                    {/* Why It Needs What It Needs */}
+                    <div>
+                      <h4 className="text-white font-bold text-sm mb-3">What it needs — and WHY:</h4>
+                      <div className="space-y-3">
+                        <ReqBar label="CPU" emoji="🧠" val={wl.whyNeeds.cpu.val} max={wl.whyNeeds.cpu.max} unit="cores" why={wl.whyNeeds.cpu.why} color="bg-blue-500" />
+                        <ReqBar label="RAM" emoji="📋" val={wl.whyNeeds.ram.val} max={wl.whyNeeds.ram.max} unit="GB" why={wl.whyNeeds.ram.why} color="bg-emerald-500" />
+                        <ReqBar label="Storage" emoji="🗄️" val={wl.whyNeeds.storage.val} max={wl.whyNeeds.storage.max} unit="TB" why={wl.whyNeeds.storage.why} color="bg-orange-500" />
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm w-20 flex items-center gap-1"><span>🎨</span> GPU</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${wl.whyNeeds.gpu.needed ? "bg-purple-500/20 text-purple-400" : "bg-slate-700 text-slate-500"}`}>
+                            {wl.whyNeeds.gpu.needed ? `YES (${wl.whyNeeds.gpu.vram}GB VRAM)` : "NOT NEEDED"}
+                          </span>
+                          <span className="text-slate-400 text-xs flex-1">{wl.whyNeeds.gpu.why}</span>
+                        </div>
+                        <ReqBar label="Network" emoji="🛣️" val={wl.whyNeeds.network.val} max={wl.whyNeeds.network.max} unit="Gbps" why={wl.whyNeeds.network.why} color="bg-cyan-500" />
+                      </div>
+                    </div>
+
+                    {/* Cloud SKU Mappings */}
+                    <div>
+                      <h4 className="text-white font-bold text-sm mb-2 flex items-center gap-2"><Cloud className="w-4 h-4" /> In the Real Cloud</h4>
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        <div className="bg-orange-950/30 border border-orange-500/20 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-orange-400 font-bold text-sm">AWS</span>
+                            <span className="bg-orange-500/20 text-orange-300 text-xs px-2 py-0.5 rounded font-mono">{wl.aws.sku}</span>
+                          </div>
+                          <p className="text-orange-200/60 text-xs mb-1">{wl.aws.cost}</p>
+                          <p className="text-slate-400 text-xs">{wl.aws.note}</p>
+                        </div>
+                        <div className="bg-blue-950/30 border border-blue-500/20 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-blue-400 font-bold text-sm">Azure</span>
+                            <span className="bg-blue-500/20 text-blue-300 text-xs px-2 py-0.5 rounded font-mono">{wl.azure.sku}</span>
+                          </div>
+                          <p className="text-blue-200/60 text-xs mb-1">{wl.azure.cost}</p>
+                          <p className="text-slate-400 text-xs">{wl.azure.note}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Cloud Economics Info Box */}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-700 border border-slate-600 rounded-xl p-5">
+              <h3 className="text-white font-bold mb-2 flex items-center gap-2"><Cloud className="w-5 h-5 text-blue-400" /> Cloud Economics 101</h3>
+              <p className="text-slate-300 text-sm mb-2">Companies like AWS and Azure don&apos;t buy one server at a time. They buy <strong className="text-white">THOUSANDS</strong> of servers and get huge discounts — then rent them to you by the hour. This is called <strong className="text-emerald-400">&quot;cloud computing.&quot;</strong></p>
+              <p className="text-slate-400 text-sm">The hardware in our Build challenges costs more upfront, but cloud pricing includes electricity, cooling, maintenance, and 24/7 support. In the real world, companies decide: &quot;Should we buy our own servers or rent from the cloud?&quot; That&apos;s a key business decision!</p>
+            </div>
 
             <button onClick={() => setTab("quiz")} className="w-full bg-emerald-500 text-white font-bold py-3 rounded-xl hover:bg-emerald-400 transition-colors">
               Ready for the Quiz? →
@@ -265,16 +505,47 @@ export default function DemoPage() {
         {/* BUILD TAB */}
         {tab === "build" && (
           <div className="animate-slide-in">
+            {/* Challenge Selector */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-4">
+              <h3 className="text-white font-bold mb-3">Choose Your Challenge</h3>
+              <div className="grid sm:grid-cols-5 gap-2">
+                {demoChallenges.map((ch) => (
+                  <button key={ch.id} onClick={() => switchChallenge(ch)}
+                    className={`text-left p-3 rounded-lg border transition-all ${selectedChallenge.id === ch.id ? "border-emerald-500 bg-emerald-500/10 selected-glow" : "border-slate-600 hover:border-slate-500"}`}>
+                    <div className="flex gap-0.5 mb-1">
+                      {Array.from({ length: 5 }).map((_, s) => (
+                        <Star key={s} className={`w-3 h-3 ${s < ch.difficulty ? "text-amber-400 fill-amber-400" : "text-slate-700"}`} />
+                      ))}
+                    </div>
+                    <div className="text-white text-sm font-medium">{ch.name}</div>
+                    <div className="text-emerald-400 text-xs">${ch.budget.toLocaleString()}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Challenge Brief */}
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/20 rounded-xl p-4 mb-4">
-              <h3 className="text-lg font-bold text-white mb-1">Build Challenge: {challengeWorkload.name}</h3>
-              <p className="text-sm text-slate-300 mb-2">{challengeWorkload.description}</p>
-              <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-                <span>CPU: {challengeWorkload.requiredCPUCores}+ cores</span>
-                <span>RAM: {challengeWorkload.requiredRAM}+ GB</span>
-                <span>Storage: {challengeWorkload.requiredStorage}+ TB</span>
-                {challengeWorkload.requiredGPU && <span className="text-amber-400">GPU Required</span>}
-                <span>Budget: ${BUDGET.toLocaleString()}</span>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-1">{selectedChallenge.name}: {challengeWorkload.name} {challengeWorkload.icon}</h3>
+                  <p className="text-sm text-slate-300 mb-3">{selectedChallenge.scenario}</p>
+                  <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                    <span>CPU: {challengeWorkload.requiredCPUCores}+ cores</span>
+                    <span>RAM: {challengeWorkload.requiredRAM}+ GB</span>
+                    <span>Storage: {challengeWorkload.requiredStorage}+ TB</span>
+                    {challengeWorkload.requiredGPU && <span className="text-amber-400">GPU Required ({challengeWorkload.requiredGPUVRAM}+ GB VRAM)</span>}
+                    <span>Network: {challengeWorkload.networkBandwidth}+ Gbps</span>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-emerald-400 font-bold">${BUDGET.toLocaleString()}</div>
+                  <div className="text-slate-500 text-xs">budget</div>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <span className="bg-orange-500/20 text-orange-300 text-xs px-2 py-1 rounded">AWS: {selectedChallenge.cloudEquiv.split(" or ")[0]?.replace("AWS ", "")}</span>
+                <span className="bg-blue-500/20 text-blue-300 text-xs px-2 py-1 rounded">Azure: {selectedChallenge.cloudEquiv.split(" or ")[1]?.replace("Azure ", "") ?? ""}</span>
               </div>
             </div>
 
@@ -422,18 +693,43 @@ export default function DemoPage() {
                   ))}
                 </div>
 
+                {/* Cloud Comparison */}
+                <div className="bg-slate-700/50 rounded-lg p-4 mb-4 text-left text-sm">
+                  <h4 className="text-white font-bold mb-2 flex items-center gap-2"><Cloud className="w-4 h-4 text-blue-400" /> Cloud Cost Comparison</h4>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-slate-400">Your hardware build</span>
+                    <span className="text-white font-bold">${totalCost.toLocaleString()} one-time</span>
+                  </div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-slate-400">Cloud equivalent</span>
+                    <span className="text-blue-400 font-bold">{selectedChallenge.cloudEquiv.split("(")[1]?.split(")")[0] ?? "~varies"}/month</span>
+                  </div>
+                  {totalCost > 0 && (
+                    <p className="text-slate-400 text-xs mt-2">
+                      At cloud rates, your ${totalCost.toLocaleString()} build pays for itself in about {Math.ceil(totalCost / (challengeWorkload.revenuePerMonth * 0.3))} months of revenue!
+                    </p>
+                  )}
+                </div>
+
                 {/* CTA to sign up */}
                 <div className="bg-gradient-to-r from-emerald-900/50 to-blue-900/50 border border-emerald-500/20 rounded-xl p-4 mb-4">
-                  <p className="text-white font-bold mb-1">Liked Day 1?</p>
+                  <p className="text-white font-bold mb-1">Liked this challenge?</p>
                   <p className="text-slate-300 text-sm mb-3">Sign in to unlock all 5 days — servers, racks, rows, and the Shark Tank competition!</p>
                   <Link href="/login" className="inline-flex items-center gap-2 bg-emerald-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-emerald-400 text-sm">
                     <Lock className="w-4 h-4" /> Sign In to Continue
                   </Link>
                 </div>
 
-                <button onClick={resetBuild} className="w-full bg-slate-700 text-white py-2 rounded-lg hover:bg-slate-600">
-                  Try Again
-                </button>
+                <div className="flex gap-3">
+                  <button onClick={resetBuild} className="flex-1 bg-slate-700 text-white py-2 rounded-lg hover:bg-slate-600">
+                    Try Again
+                  </button>
+                  {selectedChallenge.id !== "ch5" && (
+                    <button onClick={() => switchChallenge(demoChallenges[demoChallenges.findIndex(c => c.id === selectedChallenge.id) + 1])} className="flex-1 bg-emerald-500 text-white py-2 rounded-lg hover:bg-emerald-400 font-bold">
+                      Next Challenge →
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -494,6 +790,21 @@ function SummaryRow({ label, value, ok }: { label: string; value: string; ok: bo
       <span className={`flex items-center gap-1 ${ok ? "text-emerald-400" : "text-slate-500"}`}>
         {value} {ok ? <Check className="w-3 h-3" /> : null}
       </span>
+    </div>
+  );
+}
+
+function ReqBar({ label, emoji, val, max, unit, why, color }: { label: string; emoji: string; val: number; max: number; unit: string; why: string; color: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-1">
+        <span className="text-sm w-20 flex items-center gap-1"><span>{emoji}</span> {label}</span>
+        <div className="flex-1 h-2 bg-slate-700 rounded-full">
+          <div className={`h-2 ${color} rounded-full transition-all`} style={{ width: `${(val / max) * 100}%` }} />
+        </div>
+        <span className="text-white text-xs font-bold w-16 text-right">{val} {unit}</span>
+      </div>
+      <p className="text-slate-500 text-xs ml-[92px]">{why}</p>
     </div>
   );
 }
