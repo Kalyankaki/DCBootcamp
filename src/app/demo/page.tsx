@@ -221,7 +221,8 @@ function generateMathProblem(): MathProblem {
   const b = 20 + Math.floor(Math.random() * 60);
   const correctProduct = a * b;
   const showWrong = Math.random() < 0.5;
-  const shown = showWrong ? correctProduct + (Math.random() < 0.5 ? 9 : -9) : correctProduct;
+  const offset = [1, -1, 2, -2, 7, -7][Math.floor(Math.random() * 6)];
+  const shown = showWrong ? correctProduct + offset : correctProduct;
   const r = digitSumVerify(a, b, shown);
   return { question: `Is ${a} × ${b} = ${shown}? (1 = Yes, 0 = No)`, answer: r.result, explanation: r.explanation,
     hint: "Tip: Add the digits. Digit-sum of A × digit-sum of B should match digit-sum of the answer." };
@@ -326,10 +327,11 @@ export default function DemoPage() {
 
   const budgetLeft = BUDGET - totalCost;
 
-  const unlockedIds = useMemo(() => new Set(achievements.map((a) => a.id)), [achievements]);
   const unlock = (a: Achievement) => {
-    if (unlockedIds.has(a.id)) return;
-    setAchievements((prev) => [...prev, a]);
+    setAchievements((prev) => {
+      if (prev.some((p) => p.id === a.id)) return prev;
+      return [...prev, a];
+    });
   };
 
   const componentsPicked = (selectedCPU ? 1 : 0) + selectedRAM.length + selectedStorage.length +
@@ -359,13 +361,13 @@ export default function DemoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalCost, totalPower, componentsPicked]);
 
-  // Speed Run countdown
+  // Speed Run countdown — only tick when on Build tab
   useEffect(() => {
-    if (!timerRunning || buildSubmitted) return;
+    if (!timerRunning || buildSubmitted || tab !== "build") return;
     if (timeLeft <= 0) return;
     const id = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearTimeout(id);
-  }, [timerRunning, timeLeft, buildSubmitted]);
+  }, [timerRunning, timeLeft, buildSubmitted, tab]);
 
   // Math Coach: log adds when components change
   const prevPicked = useRef(0);
@@ -413,6 +415,7 @@ export default function DemoPage() {
     setBootResults([]);
     setBootStep(0);
     setBootComplete(false);
+    setBootSuccess(false);
     setMathLog([]);
     setTimerRunning(false);
     setTimeLeft(120);
@@ -938,7 +941,7 @@ export default function DemoPage() {
               <div className="bg-gradient-to-br from-emerald-950/40 to-slate-900 border-2 border-emerald-700/40 rounded-xl p-4 mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-white font-bold flex items-center gap-2">🔧 Your Motherboard</h3>
-                  <span className="text-emerald-400 text-xs font-mono">{componentsPicked} / 11 slots filled</span>
+                  <span className="text-emerald-400 text-xs font-mono">{componentsPicked} / 12 slots filled</span>
                 </div>
                 <div className="grid grid-cols-6 gap-2">
                   {/* Row 1: GPU (span 3) | NIC (span 2) | empty (1) */}
@@ -947,9 +950,9 @@ export default function DemoPage() {
                   <div className="col-span-1 flex items-center justify-center text-slate-700 text-xs">◦◦◦</div>
                   {/* Row 2: CPU (span 3) | RAM x4 (each span 1 but stacked - use simpler layout) */}
                   <MoboSlot label="CPU Socket" filled={!!selectedCPU} name={selectedCPU?.name} colSpan={3} height="h-20" onClear={() => setSelectedCPU(null)} color="blue" big />
-                  <MoboSlot label="RAM 1" filled={selectedRAM.length >= 1} name={selectedRAM[0]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 0))} color="emerald" vert />
-                  <MoboSlot label="RAM 2" filled={selectedRAM.length >= 2} name={selectedRAM[1]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 1))} color="emerald" vert />
-                  <MoboSlot label="RAM 3" filled={selectedRAM.length >= 3} name={selectedRAM[2]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 2))} color="emerald" vert />
+                  <MoboSlot label="RAM 1" filled={selectedRAM.length >= 1} name={selectedRAM[0]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 0))} color="emerald" />
+                  <MoboSlot label="RAM 2" filled={selectedRAM.length >= 2} name={selectedRAM[1]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 1))} color="emerald" />
+                  <MoboSlot label="RAM 3" filled={selectedRAM.length >= 3} name={selectedRAM[2]?.name} colSpan={1} height="h-20" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 2))} color="emerald" />
                   {/* Row 3: RAM4 | Storage x4 | PSU */}
                   <MoboSlot label="RAM 4" filled={selectedRAM.length >= 4} name={selectedRAM[3]?.name} colSpan={1} height="h-14" onClear={() => setSelectedRAM((p) => p.filter((_, i) => i !== 3))} color="emerald" />
                   <MoboSlot label="Drive 1" filled={selectedStorage.length >= 1} name={selectedStorage[0]?.name} colSpan={1} height="h-14" onClear={() => setSelectedStorage((p) => p.filter((_, i) => i !== 0))} color="orange" />
@@ -1220,8 +1223,9 @@ export default function DemoPage() {
             }}
             onInputChange={setDojoInput}
             onSubmit={() => {
-              if (!dojoProblem || dojoFeedback) return;
+              if (!dojoProblem || dojoFeedback || !dojoInput.trim()) return;
               const guess = parseFloat(dojoInput.replace(/[^\d.-]/g, ""));
+              if (Number.isNaN(guess)) return;
               const correct = Math.abs(guess - dojoProblem.answer) < 0.01;
               const elapsed = (Date.now() - dojoStartTime) / 1000;
               let gained = 0;
@@ -1330,23 +1334,22 @@ const colorClasses: Record<string, { border: string; bg: string; text: string }>
   red: { border: "border-red-500", bg: "bg-red-500/20", text: "text-red-300" },
 };
 
-function MoboSlot({ label, filled, name, colSpan, height, onClear, color, big, vert }: {
+function MoboSlot({ label, filled, name, colSpan, height, onClear, color, big }: {
   label: string; filled: boolean; name?: string; colSpan: number; height: string;
-  onClear: () => void; color: string; big?: boolean; vert?: boolean;
+  onClear: () => void; color: string; big?: boolean;
 }) {
   const c = colorClasses[color] ?? colorClasses.emerald;
-  const span = `col-span-${colSpan}`;
   const spanClasses: Record<number, string> = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" };
   return (
     <button
       onClick={filled ? onClear : undefined}
       disabled={!filled}
-      className={`${spanClasses[colSpan] ?? span} ${height} rounded-lg border-2 flex items-center justify-center text-center px-2 transition-all ${
+      className={`${spanClasses[colSpan] ?? "col-span-1"} ${height} rounded-lg border-2 flex items-center justify-center text-center px-2 transition-all ${
         filled ? `${c.border} ${c.bg} ${c.text} cursor-pointer hover:brightness-125 animate-slot-fill` : "border-dashed border-slate-700 text-slate-600"
       }`}
     >
       {filled ? (
-        <span className={`font-bold ${big ? "text-sm" : "text-[10px]"} ${vert ? "writing-vertical" : ""} line-clamp-2 leading-tight`}>
+        <span className={`font-bold ${big ? "text-sm" : "text-[10px]"} line-clamp-2 leading-tight`}>
           {name ?? label}
         </span>
       ) : (
