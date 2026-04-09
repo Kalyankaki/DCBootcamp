@@ -32,9 +32,17 @@ export default auth((req) => {
     }
   }
 
+  // Protect teacher routes - teacher and superadmin allowed
+  if (pathname.startsWith("/teacher")) {
+    const role = (req.auth.user as any)?.role;
+    if (role !== "teacher" && role !== "superadmin") {
+      return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin));
+    }
+  }
+
   return NextResponse.next();
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/day/:path*"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/teacher/:path*", "/day/:path*"],
 };

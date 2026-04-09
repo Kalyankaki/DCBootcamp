@@ -146,7 +146,7 @@ export interface UserProfile {
   email: string;
   name: string;
   image?: string;
-  role: 'student' | 'admin' | 'superadmin';
+  role: 'student' | 'teacher' | 'admin' | 'superadmin';
   totalPoints: number;
   currentDay: number;
   completedChallenges: string[];
@@ -215,4 +215,64 @@ export interface Workload {
   networkBandwidth: number; // Gbps
   revenuePerMonth: number;
   priority: 'low' | 'medium' | 'high' | 'critical';
+}
+
+// ─── Schedule & Teacher Types ───
+
+export type ScheduleBlockType =
+  | 'warmup' | 'lesson' | 'activity' | 'vedic-workshop'
+  | 'lunch' | 'energizer' | 'deep-dive' | 'show-and-tell' | 'wrapup';
+
+export interface ScheduleBlock {
+  id: string;
+  dayNumber: number;
+  type: ScheduleBlockType;
+  title: string;
+  subtitle: string;
+  startTime: string;
+  durationMinutes: number;
+  icon: string;
+  content: BlockContent;
+  teacherGuide: TeacherGuide;
+}
+
+export interface BlockContent {
+  narrative?: string[];
+  keyConcepts?: { term: string; definition: string; analogy: string; realWorldExample: string }[];
+  discussionPrompts?: string[];
+  existingComponent?: string;
+  vedicExercises?: VedicExercise[];
+  gameConfig?: { gameName: string; type: string; rules: string[]; teamBased: boolean };
+  journalPrompts?: string[];
+  badgeCeremony?: boolean;
+  tomorrowPreview?: string;
+  presentationRules?: string[];
+}
+
+export interface TeacherGuide {
+  talkingPoints: string[];
+  expectedAnswers?: Record<string, string>;
+  probingQuestions?: string[];
+  commonMisconceptions?: string[];
+  differentiationTips?: { struggling: string; advanced: string };
+  slidesBullets?: string[];
+  timerMinutes?: number;
+}
+
+export interface VedicExercise {
+  id: string;
+  type: 'quickMultiply' | 'percentageOf' | 'crossMultiply' | 'digitSum';
+  problemText: string;
+  numbers: number[];
+  context: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+}
+
+export interface TeacherSession {
+  dayNumber: number;
+  currentBlockIndex: number;
+  blockStartedAt: string | null;
+  isTimerRunning: boolean;
+  secondsElapsed: number;
+  completedBlocks: string[];
 }

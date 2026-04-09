@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   LogOut,
+  GraduationCap,
 } from "lucide-react";
 
 const dayLinks = [
@@ -56,6 +57,15 @@ export default function Navbar({ currentDay = 1, points = 0 }: NavbarProps) {
               <LayoutDashboard className="w-4 h-4" />
               Dashboard
             </Link>
+            {((session?.user as any)?.role === "teacher" || (session?.user as any)?.role === "superadmin") && (
+              <Link
+                href="/teacher"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-indigo-300 hover:text-white hover:bg-indigo-900/50 transition-all"
+              >
+                <GraduationCap className="w-4 h-4" />
+                Teacher
+              </Link>
+            )}
             {dayLinks.map((d) => {
               const Icon = d.icon;
               const isActive = currentDay === d.day;
@@ -142,6 +152,17 @@ export default function Navbar({ currentDay = 1, points = 0 }: NavbarProps) {
             <LayoutDashboard className="w-5 h-5" />
             Dashboard
           </Link>
+
+          {((session?.user as any)?.role === "teacher" || (session?.user as any)?.role === "superadmin") && (
+            <Link
+              href="/teacher"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-indigo-300 hover:text-white hover:bg-indigo-900/50 transition-all"
+            >
+              <GraduationCap className="w-5 h-5" />
+              Teacher Dashboard
+            </Link>
+          )}
 
           {dayLinks.map((d) => {
             const Icon = d.icon;

@@ -94,7 +94,7 @@ export interface GameState {
   email: string;
   name: string;
   image: string;
-  role: "student" | "admin" | "superadmin";
+  role: "student" | "teacher" | "admin" | "superadmin";
   totalPoints: number;
   badges: string[];
   completedChallenges: string[];
@@ -119,6 +119,13 @@ export interface GameState {
 
   // Leaderboard
   leaderboard: LeaderboardEntry[];
+
+  // Teacher session
+  teacherSession: {
+    dayNumber: number;
+    currentBlockIndex: number;
+    completedBlocks: string[];
+  } | null;
 
   // ---- Actions ----
 
@@ -168,6 +175,11 @@ export interface GameState {
   // Leaderboard
   setLeaderboard: (entries: LeaderboardEntry[]) => void;
 
+  // Teacher session
+  setTeacherSession: (session: { dayNumber: number; currentBlockIndex: number; completedBlocks: string[] } | null) => void;
+  advanceTeacherBlock: () => void;
+  completeTeacherBlock: (blockId: string) => void;
+
   // General
   addComponent: (level: string, component: any) => void;
   removeComponent: (level: string, index: number) => void;
@@ -177,7 +189,7 @@ export interface GameState {
     email: string;
     name: string;
     image?: string;
-    role: "student" | "admin" | "superadmin";
+    role: "student" | "teacher" | "admin" | "superadmin";
   }) => void;
 }
 
@@ -316,6 +328,8 @@ export const useGameStore = create<GameState>()(
       timeRemaining: 0,
 
       leaderboard: [],
+
+      teacherSession: null,
 
       // --- actions ---
 
@@ -539,6 +553,17 @@ export const useGameStore = create<GameState>()(
 
       // Leaderboard
       setLeaderboard: (entries) => set({ leaderboard: entries }),
+
+      // Teacher session
+      setTeacherSession: (session: { dayNumber: number; currentBlockIndex: number; completedBlocks: string[] } | null) => set({ teacherSession: session }),
+      advanceTeacherBlock: () => set((state) => {
+        if (!state.teacherSession) return {};
+        return { teacherSession: { ...state.teacherSession, currentBlockIndex: state.teacherSession.currentBlockIndex + 1 } };
+      }),
+      completeTeacherBlock: (blockId: string) => set((state) => {
+        if (!state.teacherSession) return {};
+        return { teacherSession: { ...state.teacherSession, completedBlocks: [...state.teacherSession.completedBlocks, blockId] } };
+      }),
 
       // Generic add / remove (convenience)
       addComponent: (level, component) => {

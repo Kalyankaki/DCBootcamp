@@ -6,6 +6,12 @@ const SUPER_ADMINS = [
   "communications@mathcodelab.com",
 ];
 
+const TEACHER_EMAILS = [
+  "kalyank.123@gmail.com",
+  "communications@mathcodelab.com",
+  // Add additional teacher emails here
+];
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
@@ -16,7 +22,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user?.email) {
-        token.role = SUPER_ADMINS.includes(user.email) ? "superadmin" : "student";
+        if (SUPER_ADMINS.includes(user.email)) {
+          token.role = "superadmin";
+        } else if (TEACHER_EMAILS.includes(user.email)) {
+          token.role = "teacher";
+        } else {
+          token.role = "student";
+        }
       }
       return token;
     },
