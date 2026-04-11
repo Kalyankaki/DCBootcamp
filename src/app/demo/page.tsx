@@ -384,6 +384,13 @@ export default function DemoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [componentsPicked, totalCost, totalPower]);
 
+  // Track boot sequence timers so they can be cleared on reset/unmount
+  const bootTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const clearBootTimers = () => {
+    for (const t of bootTimersRef.current) clearTimeout(t);
+    bootTimersRef.current = [];
+  };
+
   const handleQuizAnswer = (ansIdx: number) => {
     if (showExplanation) return;
     setSelectedAnswer(ansIdx);
@@ -402,6 +409,7 @@ export default function DemoPage() {
   };
 
   const resetBuild = () => {
+    clearBootTimers();
     setSelectedCPU(null);
     setSelectedRAM([]);
     setSelectedStorage([]);
@@ -429,6 +437,9 @@ export default function DemoPage() {
   };
 
   const runBootSequence = (onDone: (success: boolean) => void) => {
+    // Guard against double-invocation (e.g. rapid double-click)
+    clearBootTimers();
+
     const totalRAM = selectedRAM.reduce((s, r) => s + r.capacity, 0);
     const totalStor = selectedStorage.reduce((s, d) => s + d.capacity, 0);
     const steps: { label: string; status: "ok" | "fail" | "skip"; detail: string }[] = [
@@ -456,27 +467,39 @@ export default function DemoPage() {
         : { label: "Power Supply Test", status: "fail", detail: "No PSU" },
     ];
 
+    // Reset boot state, then set booting=true
     setBootResults([]);
     setBootStep(0);
     setBootComplete(false);
+    setBootSuccess(false);
     setBooting(true);
 
-    let i = 0;
-    const tick = () => {
-      if (i >= steps.length) {
-        const success = !steps.some((s) => s.status === "fail");
-        setBootComplete(true);
-        setBootSuccess(success);
-        setTimeout(() => onDone(success), 1200);
-        return;
-      }
-      setBootResults((prev) => [...prev, steps[i]]);
-      setBootStep(i + 1);
-      i++;
-      setTimeout(tick, 500);
-    };
-    tick();
+    // Schedule each step as its own setTimeout so the first tick runs AFTER
+    // React has committed the `booting=true` render. Running synchronously in
+    // the click handler was causing a re-entrant render crash in Next 16.
+    steps.forEach((step, idx) => {
+      const t = setTimeout(() => {
+        setBootResults((prev) => [...prev, step]);
+        setBootStep(idx + 1);
+      }, (idx + 1) * 500);
+      bootTimersRef.current.push(t);
+    });
+
+    // Final step: mark boot complete, then call onDone after a pause
+    const completeTimer = setTimeout(() => {
+      const success = !steps.some((s) => s.status === "fail");
+      setBootComplete(true);
+      setBootSuccess(success);
+      const doneTimer = setTimeout(() => onDone(success), 1200);
+      bootTimersRef.current.push(doneTimer);
+    }, (steps.length + 1) * 500);
+    bootTimersRef.current.push(completeTimer);
   };
+
+  // Clean up boot timers on unmount
+  useEffect(() => {
+    return () => clearBootTimers();
+  }, []);
 
   const submitBuild = () => {
     setTimerRunning(false);
