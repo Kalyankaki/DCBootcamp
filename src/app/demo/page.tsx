@@ -13,6 +13,16 @@ import {
 import Link from "next/link";
 import { AchievementToast, type Achievement } from "@/components/AchievementToast";
 import { quickMultiply, percentageOf, digitSumVerify } from "@/lib/vedic-math";
+import {
+  findOptimalBuild,
+  computeBuildMetrics,
+  generateReasoning,
+  computeProfitabilityScore,
+  rankFromScore as rankFromBuildScore,
+  type OptimalBuildResult,
+  type BuildMetrics,
+  type ScoreBreakdown,
+} from "@/lib/data/optimal-builds";
 
 // ─── Component Learning Data ───
 const componentInfo = [
@@ -260,6 +270,11 @@ export default function DemoPage() {
   const [buildSubmitted, setBuildSubmitted] = useState(false);
   const [buildScore, setBuildScore] = useState(0);
   const [buildFeedback, setBuildFeedback] = useState<string[]>([]);
+  const [scoreBreakdown, setScoreBreakdown] = useState<ScoreBreakdown | null>(null);
+  const [studentMetrics, setStudentMetrics] = useState<BuildMetrics | null>(null);
+  const [optimalBuild, setOptimalBuild] = useState<OptimalBuildResult | null>(null);
+  const [optimalReasoning, setOptimalReasoning] = useState<string[]>([]);
+  const [showOptimal, setShowOptimal] = useState(false);
 
   // Boot sequence state
   const [booting, setBooting] = useState(false);
@@ -419,6 +434,11 @@ export default function DemoPage() {
     setBuildSubmitted(false);
     setBuildScore(0);
     setBuildFeedback([]);
+    setScoreBreakdown(null);
+    setStudentMetrics(null);
+    setOptimalBuild(null);
+    setOptimalReasoning([]);
+    setShowOptimal(false);
     setBooting(false);
     setBootResults([]);
     setBootStep(0);
@@ -507,50 +527,77 @@ export default function DemoPage() {
     setFinalBuildTime(elapsed);
 
     runBootSequence((bootOk) => {
-      let score = 0;
       const feedback: string[] = [];
 
-      if (totalCost <= BUDGET) { score += 30; feedback.push("Within budget! Great job managing costs."); }
-      else { feedback.push("Over budget! You need to cut costs."); }
+      // Compute student metrics
+      const myMetrics = computeBuildMetrics(
+        selectedCPU, selectedRAM, selectedStorage, selectedGPU, selectedNIC, selectedPSU,
+        challengeWorkload.id,
+      );
+      setStudentMetrics(myMetrics);
 
-      if (selectedCPU) { score += 15; } else { feedback.push("You need a CPU!"); }
-      if (selectedRAM.length > 0) { score += 10; } else { feedback.push("Add some RAM!"); }
-      if (selectedStorage.length > 0) { score += 10; } else { feedback.push("Add storage!"); }
-      if (selectedPSU) {
-        if (selectedPSU.wattage >= totalPower) { score += 15; feedback.push("PSU handles the power draw. Smart!"); }
-        else { score += 5; feedback.push("PSU wattage is too low for your components!"); }
-      } else { feedback.push("Don't forget the power supply!"); }
-      if (selectedNIC) { score += 5; }
+      // Find optimal build
+      const optimal = findOptimalBuild(challengeWorkload.id, BUDGET);
+      setOptimalBuild(optimal);
 
-      const cpuCores = selectedCPU?.cores ?? 0;
-      const totalRAM = selectedRAM.reduce((s, r) => s + r.capacity, 0);
-      const totalStor = selectedStorage.reduce((s, d) => s + d.capacity, 0);
-      const meetsReqs = cpuCores >= challengeWorkload.requiredCPUCores && totalRAM >= challengeWorkload.requiredRAM && totalStor >= challengeWorkload.requiredStorage;
-      if (meetsReqs) {
-        score += 15;
-        feedback.push(`Build meets ${challengeWorkload.name} requirements!`);
-      } else {
-        feedback.push(`Build doesn't fully meet ${challengeWorkload.name} needs.`);
+      // Compute profitability score
+      const breakdown = computeProfitabilityScore(myMetrics, optimal?.metrics ?? null, bootOk);
+      setScoreBreakdown(breakdown);
+
+      // Build feedback messages based on the breakdown
+      if (myMetrics.meetsRequirements) feedback.push(`Build meets ${challengeWorkload.name} requirements!`);
+      else feedback.push(`Build doesn't fully meet ${challengeWorkload.name} needs.`);
+
+      if (myMetrics.totalCost <= BUDGET) feedback.push(`Within budget ($${myMetrics.totalCost.toLocaleString()}).`);
+      else feedback.push(`Over budget by $${(myMetrics.totalCost - BUDGET).toLocaleString()}!`);
+
+      if (selectedPSU && selectedPSU.wattage >= totalPower) feedback.push("PSU handles the power draw. Smart!");
+      else if (selectedPSU) feedback.push("PSU wattage is too low for your components!");
+      else feedback.push("Don't forget the power supply!");
+
+      if (myMetrics.profitMargin >= 20) {
+        feedback.push(`Great profit margin: ${myMetrics.profitMargin.toFixed(1)}%!`);
+      } else if (myMetrics.profitMargin > 0) {
+        feedback.push(`Profit margin: ${myMetrics.profitMargin.toFixed(1)}% — you can do better.`);
       }
 
-      // Speed run bonus
+      // Generate reasoning comparing student to optimal
+      if (optimal) {
+        const reasons = generateReasoning(
+          selectedCPU, selectedRAM, selectedStorage, selectedGPU, selectedPSU,
+          optimal.config, challengeWorkload.id,
+        );
+        setOptimalReasoning(reasons);
+      }
+
+      let score = breakdown.total;
+
+      // Speed run bonus (applied on top of profitability score)
       if (speedRunOn && elapsed !== null && bootOk) {
-        if (elapsed < 60) { score = Math.round(score * 2); feedback.push(`Speed Run x2! Built in ${elapsed}s.`); }
-        else if (elapsed < 90) { score = Math.round(score * 1.5); feedback.push(`Speed Run x1.5! Built in ${elapsed}s.`); }
+        if (elapsed < 60) { score = Math.min(100, Math.round(score * 1.25)); feedback.push(`Speed Run x1.25! Built in ${elapsed}s.`); }
+        else if (elapsed < 90) { score = Math.min(100, Math.round(score * 1.15)); feedback.push(`Speed Run x1.15! Built in ${elapsed}s.`); }
       }
 
       // Achievements on submit
+      const cpuCores = selectedCPU?.cores ?? 0;
+      const totalRAMCapacity = selectedRAM.reduce((s, r) => s + r.capacity, 0);
+      const meetsReqs = myMetrics.meetsRequirements;
+
       if (elapsed !== null && elapsed < 60 && bootOk) {
         unlock({ id: "speed-build", emoji: "🏎️", title: "Speed Build!", description: "Finished in under 60 seconds!" });
       }
       if (score >= 80) {
         unlock({ id: "champion", emoji: "🌟", title: "Challenge Champion!", description: "Scored 80+ on a build!" });
       }
-      if (meetsReqs && cpuCores >= challengeWorkload.requiredCPUCores * 2 && totalRAM >= challengeWorkload.requiredRAM * 2) {
+      if (meetsReqs && cpuCores >= challengeWorkload.requiredCPUCores * 2 && totalRAMCapacity >= challengeWorkload.requiredRAM * 2) {
         unlock({ id: "overkill", emoji: "💪", title: "Overkill!", description: "Doubled the required specs." });
       }
-      if (meetsReqs && cpuCores < challengeWorkload.requiredCPUCores * 1.5 && totalRAM < challengeWorkload.requiredRAM * 1.5) {
+      if (meetsReqs && cpuCores < challengeWorkload.requiredCPUCores * 1.5 && totalRAMCapacity < challengeWorkload.requiredRAM * 1.5) {
         unlock({ id: "perfect-match", emoji: "🎯", title: "Perfect Match!", description: "Specs dialed in just right." });
+      }
+      // New achievement: profit wizard
+      if (myMetrics.profitMargin >= 25) {
+        unlock({ id: "profit-wizard", emoji: "💰", title: "Profit Wizard!", description: "Achieved 25%+ profit margin!" });
       }
 
       setBuildScore(score);
@@ -568,6 +615,10 @@ export default function DemoPage() {
         <Sparkles className="w-4 h-4" />
         Demo Mode — Try Day 1 without signing in!
         <Link href="/login" className="underline font-bold ml-2">Sign in for the full 5-day experience →</Link>
+      </div>
+      {/* Advanced Mode Ribbon */}
+      <div className="bg-purple-900/40 border-b border-purple-500/30 text-center py-1.5 px-4 text-xs text-purple-200">
+        🎓 Want more? Try <Link href="/demo-advanced" className="font-bold underline text-purple-300 hover:text-white">Advanced Mode</Link> — TCO, failure rates, and support contracts for higher-grade students
       </div>
 
       {/* Header */}
@@ -1160,21 +1211,43 @@ export default function DemoPage() {
               </div>
             ) : buildSubmitted && !booting ? (
               /* Results */
-              <div className="max-w-lg mx-auto bg-slate-800 border border-slate-700 rounded-xl p-8 text-center animate-fade-in-up">
-                <Trophy className="w-16 h-16 text-amber-400 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">Build Complete!</h2>
-                <p className="text-5xl font-black text-emerald-400 mb-2">{buildScore}/100</p>
-                {finalBuildTime !== null && speedRunOn && (
-                  <p className="text-amber-400 text-sm font-bold mb-4 flex items-center justify-center gap-2">
-                    <Timer className="w-4 h-4" /> Built in {finalBuildTime}s
-                  </p>
-                )}
-                <div className="flex justify-center mb-4">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star key={s} className={`w-6 h-6 ${s <= Math.ceil(buildScore / 20) ? "text-amber-400 fill-amber-400" : "text-slate-600"}`} />
-                  ))}
+              <div className="max-w-2xl mx-auto bg-slate-800 border border-slate-700 rounded-xl p-8 animate-fade-in-up">
+                <div className="text-center mb-4">
+                  <Trophy className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-white mb-2">Build Complete!</h2>
+                  <p className="text-5xl font-black text-emerald-400 mb-2">{buildScore}/100</p>
+                  {(() => {
+                    const r = rankFromBuildScore(buildScore);
+                    return (
+                      <p className={`text-lg font-bold ${r.color}`}>
+                        {r.emoji} {r.rank}
+                      </p>
+                    );
+                  })()}
+                  {finalBuildTime !== null && speedRunOn && (
+                    <p className="text-amber-400 text-sm font-bold mt-2 flex items-center justify-center gap-2">
+                      <Timer className="w-4 h-4" /> Built in {finalBuildTime}s
+                    </p>
+                  )}
                 </div>
-                <div className="text-left space-y-2 mb-6">
+
+                {/* Score breakdown */}
+                {scoreBreakdown && (
+                  <div className="bg-slate-900/50 rounded-lg p-4 mb-4">
+                    <h4 className="text-white font-bold text-sm mb-3">Score Breakdown</h4>
+                    <div className="space-y-2">
+                      <ScoreRow label="Requirements Met" value={scoreBreakdown.requirementsMet} max={20} />
+                      <ScoreRow label="Boot Success" value={scoreBreakdown.bootSuccess} max={10} />
+                      <ScoreRow label="Cost Efficiency" value={scoreBreakdown.costEfficiency} max={25} />
+                      <ScoreRow label="Right-Sizing" value={scoreBreakdown.rightSizing} max={20} />
+                      <ScoreRow label="Power Efficiency" value={scoreBreakdown.powerEfficiency} max={10} />
+                      <ScoreRow label="Profit Margin" value={scoreBreakdown.profitMargin} max={15} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Feedback */}
+                <div className="text-left space-y-2 mb-4">
                   {buildFeedback.map((f, i) => (
                     <p key={i} className="text-sm text-slate-300 flex items-start gap-2">
                       {f.includes("!") && !f.includes("Don't") && !f.includes("Over") && !f.includes("doesn't") ? <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> : <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />}
@@ -1183,23 +1256,90 @@ export default function DemoPage() {
                   ))}
                 </div>
 
-                {/* Cloud Comparison */}
-                <div className="bg-slate-700/50 rounded-lg p-4 mb-4 text-left text-sm">
-                  <h4 className="text-white font-bold mb-2 flex items-center gap-2"><Cloud className="w-4 h-4 text-blue-400" /> Cloud Cost Comparison</h4>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-slate-400">Your hardware build</span>
-                    <span className="text-white font-bold">${totalCost.toLocaleString()} one-time</span>
+                {/* Profitability Metrics */}
+                {studentMetrics && studentMetrics.meetsRequirements && studentMetrics.totalCost <= BUDGET && (
+                  <div className="bg-slate-700/50 rounded-lg p-4 mb-4">
+                    <h4 className="text-white font-bold mb-3 flex items-center gap-2">💰 Your Business Metrics</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <MetricBox label="Monthly Revenue" value={`$${studentMetrics.monthlyRevenue.toLocaleString()}`} color="text-emerald-400" />
+                      <MetricBox label="Hardware Cost" value={`$${studentMetrics.totalCost.toLocaleString()}`} color="text-white" />
+                      <MetricBox label="Profit Margin" value={`${studentMetrics.profitMargin.toFixed(1)}%`} color={studentMetrics.profitMargin >= 20 ? "text-emerald-400" : studentMetrics.profitMargin >= 10 ? "text-amber-400" : "text-red-400"} />
+                      <MetricBox label="Payback Period" value={isFinite(studentMetrics.paybackMonths) ? `${Math.ceil(studentMetrics.paybackMonths)} months` : "Never"} color={isFinite(studentMetrics.paybackMonths) ? "text-blue-400" : "text-red-400"} />
+                    </div>
                   </div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-slate-400">Cloud equivalent</span>
-                    <span className="text-blue-400 font-bold">{selectedChallenge.cloudEquiv.split("(")[1]?.split(")")[0] ?? "~varies"}/month</span>
+                )}
+
+                {/* Optimal Build Reveal */}
+                {optimalBuild && studentMetrics && studentMetrics.meetsRequirements && studentMetrics.totalCost <= BUDGET && (
+                  <div className="bg-gradient-to-br from-amber-950/40 to-orange-950/30 border border-amber-500/40 rounded-xl overflow-hidden mb-4">
+                    <button
+                      onClick={() => setShowOptimal(!showOptimal)}
+                      className="w-full p-4 text-left flex items-center justify-between hover:bg-amber-900/20 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">🎯</span>
+                        <div>
+                          <h4 className="text-amber-300 font-bold">See the Most Profitable Build</h4>
+                          <p className="text-amber-200/60 text-xs">Compare your build to the optimal solution</p>
+                        </div>
+                      </div>
+                      {showOptimal ? <ChevronUp className="w-5 h-5 text-amber-400" /> : <ChevronDown className="w-5 h-5 text-amber-400" />}
+                    </button>
+                    {showOptimal && (
+                      <div className="px-4 pb-4 space-y-3 border-t border-amber-500/30 pt-3">
+                        {/* Side-by-side comparison */}
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="bg-slate-800/50 rounded-lg p-3">
+                            <h5 className="text-slate-400 font-bold mb-2 uppercase">Your Build</h5>
+                            <div className="space-y-1">
+                              <div className="flex justify-between"><span className="text-slate-500">Cost</span><span className="text-white">${studentMetrics.totalCost.toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500">Power</span><span className="text-white">{studentMetrics.totalPower}W</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500">Margin</span><span className="text-white">{studentMetrics.profitMargin.toFixed(1)}%</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500">Payback</span><span className="text-white">{isFinite(studentMetrics.paybackMonths) ? `${Math.ceil(studentMetrics.paybackMonths)}mo` : "—"}</span></div>
+                            </div>
+                          </div>
+                          <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-lg p-3">
+                            <h5 className="text-emerald-400 font-bold mb-2 uppercase">Optimal Build</h5>
+                            <div className="space-y-1">
+                              <div className="flex justify-between"><span className="text-slate-500">Cost</span><span className="text-emerald-300">${optimalBuild.metrics.totalCost.toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500">Power</span><span className="text-emerald-300">{optimalBuild.metrics.totalPower}W</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500">Margin</span><span className="text-emerald-300">{optimalBuild.metrics.profitMargin.toFixed(1)}%</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500">Payback</span><span className="text-emerald-300">{isFinite(optimalBuild.metrics.paybackMonths) ? `${Math.ceil(optimalBuild.metrics.paybackMonths)}mo` : "—"}</span></div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Optimal components */}
+                        <div className="bg-slate-800/50 rounded-lg p-3">
+                          <h5 className="text-amber-300 font-bold text-xs mb-2 uppercase">Optimal Components</h5>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                            <div className="text-slate-400">CPU: <span className="text-white">{optimalBuild.config.cpu.name}</span></div>
+                            <div className="text-slate-400">RAM: <span className="text-white">{optimalBuild.config.ramCount}× {optimalBuild.config.ram.name}</span></div>
+                            <div className="text-slate-400">Storage: <span className="text-white">{optimalBuild.config.storageCount}× {optimalBuild.config.storage.name}</span></div>
+                            <div className="text-slate-400">GPU: <span className="text-white">{optimalBuild.config.gpu?.name ?? "None"}</span></div>
+                            <div className="text-slate-400">NIC: <span className="text-white">{optimalBuild.config.nic.name}</span></div>
+                            <div className="text-slate-400">PSU: <span className="text-white">{optimalBuild.config.psu.name}</span></div>
+                          </div>
+                        </div>
+
+                        {/* Reasoning */}
+                        {optimalReasoning.length > 0 && (
+                          <div className="bg-slate-800/50 rounded-lg p-3">
+                            <h5 className="text-amber-300 font-bold text-xs mb-2 uppercase">📖 Why the Optimal Wins</h5>
+                            <ul className="space-y-1">
+                              {optimalReasoning.map((reason, i) => (
+                                <li key={i} className="text-xs text-slate-300 flex items-start gap-1.5">
+                                  <span className="text-amber-400 mt-0.5">•</span>
+                                  <span>{reason}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {totalCost > 0 && (
-                    <p className="text-slate-400 text-xs mt-2">
-                      At cloud rates, your ${totalCost.toLocaleString()} build pays for itself in about {Math.ceil(totalCost / (challengeWorkload.revenuePerMonth * 0.3))} months of revenue!
-                    </p>
-                  )}
-                </div>
+                )}
 
                 {/* CTA to sign up */}
                 <div className="bg-gradient-to-r from-emerald-900/50 to-blue-900/50 border border-emerald-500/20 rounded-xl p-4 mb-4">
@@ -1329,6 +1469,29 @@ function SummaryRow({ label, value, ok }: { label: string; value: string; ok: bo
       <span className={`flex items-center gap-1 ${ok ? "text-emerald-400" : "text-slate-500"}`}>
         {value} {ok ? <Check className="w-3 h-3" /> : null}
       </span>
+    </div>
+  );
+}
+
+function ScoreRow({ label, value, max }: { label: string; value: number; max: number }) {
+  const pct = (value / max) * 100;
+  const color = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-slate-400 w-32 shrink-0">{label}</span>
+      <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+        <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-slate-300 font-mono w-12 text-right">{value}/{max}</span>
+    </div>
+  );
+}
+
+function MetricBox({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="bg-slate-800/50 rounded-lg p-3">
+      <div className="text-slate-400 text-xs mb-1">{label}</div>
+      <div className={`font-bold text-lg ${color}`}>{value}</div>
     </div>
   );
 }

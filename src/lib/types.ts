@@ -1,3 +1,19 @@
+// Advanced reliability/support fields — optional, only populated for Advanced Mode
+export interface SupportTier {
+  annualCost: number;
+  responseHours: number;
+}
+export interface AdvancedSpec {
+  mtbfHours: number;            // Mean Time Between Failures
+  annualFailureRate: number;    // 0.02 = 2%/year
+  replacementCost: number;      // Usually same as price, sometimes higher due to shipping/labor
+  supportTiers: {
+    basic: SupportTier;
+    standard: SupportTier;
+    premium: SupportTier;
+  };
+}
+
 // Component types for motherboard parts
 export interface CPUSpec {
   id: string;
@@ -9,6 +25,7 @@ export interface CPUSpec {
   price: number;
   performanceScore: number;
   bestFor: string[]; // e.g., ["AI Training", "Web Hosting"]
+  advanced?: AdvancedSpec;
 }
 
 export interface RAMSpec {
@@ -30,6 +47,7 @@ export interface StorageSpec {
   writeSpeed: number; // MB/s
   price: number;
   performanceScore: number;
+  advanced?: AdvancedSpec;
 }
 
 export interface GPUSpec {
@@ -41,6 +59,7 @@ export interface GPUSpec {
   price: number;
   performanceScore: number;
   bestFor: string[];
+  advanced?: AdvancedSpec;
 }
 
 export interface NetworkCard {
@@ -57,6 +76,7 @@ export interface PowerSupply {
   wattage: number;
   efficiency: string; // 80+ Bronze, Silver, Gold, Platinum
   price: number;
+  advanced?: AdvancedSpec;
 }
 
 export interface Motherboard {
@@ -215,6 +235,9 @@ export interface Workload {
   networkBandwidth: number; // Gbps
   revenuePerMonth: number;
   priority: 'low' | 'medium' | 'high' | 'critical';
+  // Advanced mode fields (optional)
+  downtimeCostPerHour?: number;   // How much revenue is lost per hour of outage
+  requiredUptime?: number;         // 0.999 = 99.9%, 0.9999 = 99.99%, etc.
 }
 
 // ─── Schedule & Teacher Types ───
