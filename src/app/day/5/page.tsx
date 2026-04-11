@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useGameStore } from "@/lib/store";
 import {
   rackTemplates,
@@ -420,6 +421,11 @@ export default function Day5Page() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Advanced Extension Ribbon */}
+      <div className="bg-purple-900/40 border-b border-purple-500/30 text-center py-1.5 px-4 text-xs text-purple-200">
+        🎓 Shark Tank prep: Try <Link href="/demo-advanced" className="font-bold underline text-purple-300 hover:text-white">Advanced Mode</Link> to know your TCO cold for investor grilling
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">

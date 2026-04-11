@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from "react";
 import {
-  BookOpen, Presentation, Users, BookMarked, Play, Pause, ChevronRight,
+  BookOpen, Presentation, Users, BookMarked, Play, ChevronRight,
   ChevronLeft, Clock, Check, ChevronDown, ChevronUp, X, Timer,
-  GraduationCap, Star, Cpu, Zap, Trophy,
+  GraduationCap, Star, Trophy, Sparkles, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { cpus, rams, storages, gpus, networkCards, powerSupplies } from "@/lib/data/components";
 import { workloads } from "@/lib/data/workloads";
 import { vedicTips } from "@/lib/vedic-math";
 import { daySchedules } from "@/lib/data/schedule";
+import { advancedCurriculum, advancedBlockCount } from "@/lib/data/advanced-curriculum";
 import type { ScheduleBlock } from "@/lib/types";
 
 const dayThemes = [
@@ -39,7 +40,7 @@ const mockStudents = [
   { name: "Olivia B.", block: "Wrap-up", d1: 98, d2: 94, d3: 0, d4: 0, d5: 0, pts: 192, badges: 7 },
 ];
 
-type Tab = "agenda" | "slides" | "progress" | "reference";
+type Tab = "agenda" | "slides" | "progress" | "reference" | "advanced";
 
 export default function TeacherDashboard() {
   const [tab, setTab] = useState<Tab>("agenda");
@@ -128,7 +129,7 @@ export default function TeacherDashboard() {
         </div>
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4 flex gap-1">
-          {([["agenda", BookOpen, "Agenda"], ["slides", Presentation, "Slides"], ["progress", Users, "Students"], ["reference", BookMarked, "Reference"]] as const).map(([key, Icon, label]) => (
+          {([["agenda", BookOpen, "Agenda"], ["slides", Presentation, "Slides"], ["progress", Users, "Students"], ["reference", BookMarked, "Reference"], ["advanced", Sparkles, "Advanced"]] as const).map(([key, Icon, label]) => (
             <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${tab === key ? "border-indigo-400 text-indigo-300" : "border-transparent text-slate-400 hover:text-white"}`}>
               <Icon className="w-4 h-4" />{label}
             </button>
@@ -419,7 +420,162 @@ export default function TeacherDashboard() {
             </RefSection>
           </div>
         )}
+
+        {/* ─── ADVANCED TAB ─── */}
+        {tab === "advanced" && (
+          <div className="animate-slide-in">
+            {/* Header banner */}
+            <div className="bg-gradient-to-br from-purple-900/40 to-indigo-900/30 border border-purple-500/40 rounded-xl p-5 mb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-purple-400" />
+                    Advanced Mode Curriculum
+                  </h2>
+                  <p className="text-slate-300 text-sm mb-2">
+                    <strong className="text-white">Optional content</strong> for higher-grade students or kids who want to go deeper. These blocks cover TCO, failure rates, support contracts, and OpEx — concepts real data center engineers deal with every day.
+                  </p>
+                  <p className="text-slate-400 text-xs">
+                    Use these to extend the standard 8-hour curriculum. Each block works with the interactive demo at <Link href="/demo-advanced" className="text-purple-300 underline hover:text-white">/demo-advanced</Link>
+                  </p>
+                </div>
+                <Link href="/demo-advanced" target="_blank" className="bg-purple-600 text-white font-bold text-sm px-4 py-2 rounded-lg hover:bg-purple-500 flex items-center gap-2 shrink-0">
+                  <ExternalLink className="w-4 h-4" /> Open Demo
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+                <AdvStat label="Total Blocks" value={advancedBlockCount.toString()} />
+                <AdvStat label="Days Covered" value="3-5" />
+                <AdvStat label="Recommended For" value="Grade 7+" />
+                <AdvStat label="Extra Time" value="~3 hours" />
+              </div>
+            </div>
+
+            {/* Per-day advanced blocks */}
+            <div className="space-y-4">
+              {[3, 4, 5].map((dayNum) => {
+                const blocks = advancedCurriculum[dayNum] ?? [];
+                if (blocks.length === 0) return null;
+                const theme = dayThemes.find((d) => d.day === dayNum);
+                return (
+                  <div key={dayNum} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+                    <div className="bg-slate-900/50 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{theme?.icon}</span>
+                        <div>
+                          <h3 className="text-white font-bold">Day {dayNum}: {theme?.title}</h3>
+                          <p className="text-slate-400 text-xs">{blocks.length} advanced {blocks.length === 1 ? "block" : "blocks"} available</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-slate-700">
+                      {blocks.map((block) => (
+                        <AdvancedBlockCard key={block.id} block={block} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Teaching tips */}
+            <div className="bg-amber-950/30 border border-amber-700/30 rounded-xl p-5 mt-4">
+              <h3 className="text-amber-300 font-bold mb-2 flex items-center gap-2">
+                <Star className="w-5 h-5" /> Teaching Advanced Mode
+              </h3>
+              <ul className="text-sm text-amber-100/80 space-y-1.5">
+                <li>• <strong>Pick 1-2 blocks per day</strong> — don&apos;t try to cover everything. Quality over quantity.</li>
+                <li>• <strong>Start with Day 3 &quot;3-Year Reality Check&quot;</strong> — it&apos;s the foundation of TCO thinking.</li>
+                <li>• <strong>Use /demo-advanced live on projector</strong> — students learn by watching you explore it.</li>
+                <li>• <strong>Pair advanced students together</strong> — they push each other harder than alone.</li>
+                <li>• <strong>Don&apos;t skip the standard curriculum</strong> — advanced is for EXTENSION, not replacement.</li>
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function AdvStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
+      <div className="text-slate-500 text-xs">{label}</div>
+      <div className="text-white font-bold text-sm">{value}</div>
+    </div>
+  );
+}
+
+function AdvancedBlockCard({ block }: { block: ScheduleBlock }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-700/20 transition-colors">
+        <span className="text-2xl shrink-0">{block.icon}</span>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-white font-bold text-sm">{block.title}</h4>
+          <p className="text-slate-400 text-xs">{block.subtitle}</p>
+        </div>
+        <div className="text-right shrink-0 flex items-center gap-3">
+          <div className="flex flex-col items-end">
+            <span className="text-purple-300 text-xs font-mono">{block.durationMinutes} min</span>
+            <span className="text-slate-500 text-[10px] uppercase">{block.type.replace("-", " ")}</span>
+          </div>
+          {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-slate-700/50 pt-3">
+          {/* Narrative */}
+          {block.content.narrative && block.content.narrative.length > 0 && (
+            <div>
+              <h5 className="text-purple-300 font-bold text-xs uppercase mb-1">Narrative</h5>
+              <ul className="text-slate-300 text-xs space-y-1">
+                {block.content.narrative.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
+            </div>
+          )}
+          {/* Teacher guide */}
+          <div>
+            <h5 className="text-purple-300 font-bold text-xs uppercase mb-1">Talking Points</h5>
+            <ul className="text-slate-300 text-xs space-y-1">
+              {block.teacherGuide.talkingPoints.map((tp, i) => (
+                <li key={i} className="flex items-start gap-1.5">
+                  <ChevronRight className="w-3 h-3 text-purple-400 mt-0.5 shrink-0" />
+                  {tp}
+                </li>
+              ))}
+            </ul>
+          </div>
+          {block.teacherGuide.probingQuestions && block.teacherGuide.probingQuestions.length > 0 && (
+            <div>
+              <h5 className="text-amber-300 font-bold text-xs uppercase mb-1">Ask the Class</h5>
+              <ul className="text-amber-200/80 text-xs space-y-1">
+                {block.teacherGuide.probingQuestions.map((q, i) => <li key={i}>💬 {q}</li>)}
+              </ul>
+            </div>
+          )}
+          {block.teacherGuide.differentiationTips && (
+            <div className="grid sm:grid-cols-2 gap-2">
+              <div className="bg-blue-950/30 border border-blue-700/30 rounded-lg p-2">
+                <div className="text-blue-300 font-bold text-[10px] uppercase mb-1">If Struggling</div>
+                <p className="text-blue-200/70 text-xs">{block.teacherGuide.differentiationTips.struggling}</p>
+              </div>
+              <div className="bg-purple-950/30 border border-purple-700/30 rounded-lg p-2">
+                <div className="text-purple-300 font-bold text-[10px] uppercase mb-1">If Advanced</div>
+                <p className="text-purple-200/70 text-xs">{block.teacherGuide.differentiationTips.advanced}</p>
+              </div>
+            </div>
+          )}
+          {/* Launch demo button */}
+          {block.content.existingComponent === "demo-advanced" && (
+            <Link href="/demo-advanced" target="_blank" className="inline-flex items-center gap-2 bg-purple-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-purple-500 transition-colors">
+              <ExternalLink className="w-3 h-3" /> Launch Advanced Demo
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
