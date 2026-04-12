@@ -275,11 +275,25 @@ export default function TeacherDashboard() {
           <div className="flex flex-col items-center justify-center min-h-[70vh]">
             {slidesBlock && slidesBlock.teacherGuide.slidesBullets ? (
               <>
-                <div className="text-indigo-400 text-sm font-bold mb-4">{slidesBlock.title}</div>
-                <div className="bg-slate-800 border-2 border-indigo-500/40 rounded-2xl p-12 max-w-4xl w-full min-h-[400px] flex items-center justify-center">
-                  <p className="text-white text-3xl md:text-4xl font-bold text-center leading-relaxed">
-                    {slidesBlock.teacherGuide.slidesBullets[slideIdx]}
-                  </p>
+                <div className="text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-4">{slidesBlock.title}</div>
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-10 md:p-14 max-w-4xl w-full min-h-[440px] flex flex-col justify-center">
+                  {(() => {
+                    const raw = slidesBlock.teacherGuide.slidesBullets![slideIdx];
+                    // Convention: first line is the heading, the rest (separated
+                    // by \n) is a semi-verbose body paragraph the teacher can
+                    // read aloud or paraphrase to deliver the point.
+                    const parts = raw.split(/\n+/);
+                    const heading = parts[0];
+                    const body = parts.slice(1).join(" ").trim();
+                    return (
+                      <>
+                        <h2 className="text-white text-2xl md:text-3xl font-bold leading-tight mb-5">{heading}</h2>
+                        {body && (
+                          <p className="text-slate-200 text-base md:text-lg leading-relaxed">{body}</p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-6 mt-8">
                   <button onClick={() => setSlideIdx((i) => Math.max(0, i - 1))} disabled={slideIdx === 0}
