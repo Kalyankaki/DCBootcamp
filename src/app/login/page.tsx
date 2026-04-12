@@ -1,43 +1,68 @@
 "use client";
 
 import { signIn, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Server, Zap, Shield, Brain } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, Suspense } from "react";
+import Link from "next/link";
+import { Server, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen app-surface" />}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackParam = searchParams.get("callbackUrl");
+
+  // Role-based landing — teachers go to the Command Center, students go to the dashboard
+  const destinationFor = (role: string | undefined): string => {
+    if (callbackParam && callbackParam.startsWith("/")) return callbackParam;
+    if (role === "teacher" || role === "superadmin") return "/teacher";
+    return "/dashboard";
+  };
 
   useEffect(() => {
-    if (session) router.push("/dashboard");
-  }, [session, router]);
+    if (session) {
+      const role = (session.user as { role?: string } | undefined)?.role;
+      router.replace(destinationFor(role));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 p-4">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 text-6xl opacity-10 animate-float">🖥️</div>
-        <div className="absolute top-40 right-20 text-5xl opacity-10 animate-float" style={{ animationDelay: "1s" }}>⚡</div>
-        <div className="absolute bottom-20 left-1/4 text-7xl opacity-10 animate-float" style={{ animationDelay: "2s" }}>🗄️</div>
-        <div className="absolute bottom-40 right-1/3 text-4xl opacity-10 animate-float" style={{ animationDelay: "0.5s" }}>🌐</div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center app-surface p-4">
+      <div className="w-full max-w-md">
+        <Link href="/" className="inline-flex items-center gap-1 text-xs app-text-muted hover:app-text-strong mb-5">
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to home
+        </Link>
 
-      <div className="relative z-10 max-w-md w-full">
-        <div className="bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-700 p-8">
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-blue-500 mb-4">
-              <Server className="w-10 h-10 text-white" />
+        <div className="app-card rounded-lg p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-md app-accent-bg flex items-center justify-center">
+              <Server className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white">DC Bootcamp</h1>
-            <p className="text-emerald-400 font-medium mt-1">⚡ Build the Internet, One Chip at a Time!</p>
+            <div>
+              <h1 className="app-text-strong font-semibold text-lg tracking-tight">DC Bootcamp</h1>
+              <p className="app-text-muted text-xs">MathCodeLab Program</p>
+            </div>
           </div>
 
-          {/* Sign In Button */}
+          <div className="mb-6">
+            <h2 className="app-text-strong text-xl font-semibold tracking-tight mb-1">Sign in to continue</h2>
+            <p className="app-text-muted text-sm">
+              Your role — student or teacher — determines where you land. Teachers go straight to the Command Center.
+            </p>
+          </div>
+
           <button
-            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-            className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-semibold py-3 px-6 rounded-xl hover:bg-gray-100 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+            onClick={() => signIn("google", { callbackUrl: callbackParam ?? "/dashboard" })}
+            className="w-full flex items-center justify-center gap-3 bg-white text-slate-800 font-semibold py-3 px-6 rounded-lg hover:bg-slate-100 transition-colors shadow-sm border border-slate-300"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
@@ -48,26 +73,15 @@ export default function LoginPage() {
             Sign in with Google
           </button>
 
-          {/* Features */}
-          <div className="mt-8 space-y-3">
-            <div className="flex items-center gap-3 text-slate-300 text-sm">
-              <Zap className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span>5-day hands-on data center journey</span>
-            </div>
-            <div className="flex items-center gap-3 text-slate-300 text-sm">
-              <Shield className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <span>Build servers, racks, and entire data centers</span>
-            </div>
-            <div className="flex items-center gap-3 text-slate-300 text-sm">
-              <Brain className="w-4 h-4 text-purple-400 flex-shrink-0" />
-              <span>Learn Vedic math shortcuts for quick calculations</span>
-            </div>
+          <div className="mt-6 pt-5 border-t border-t-[var(--border-subtle)] grid grid-cols-2 gap-3 text-xs">
+            <Link href="/demo" className="app-text-muted hover:app-text-strong">Try the demo →</Link>
+            <Link href="/demo-advanced" className="app-text-muted hover:app-text-strong text-right">Advanced demo →</Link>
           </div>
-
-          <p className="text-center text-slate-500 text-xs mt-6">
-            A MathCodeLab Production
-          </p>
         </div>
+
+        <p className="text-center app-text-subtle text-xs mt-5">
+          By signing in you agree to our terms of service.
+        </p>
       </div>
     </div>
   );

@@ -229,38 +229,39 @@ export default function DemoAdvancedPage() {
     <div className="min-h-screen bg-slate-900">
       <AchievementToast achievements={achievements} />
 
-      {/* Advanced Mode Banner */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2">
-        <GraduationCap className="w-4 h-4" />
-        Advanced Mode — TCO · Failure Rates · Support Contracts
-        <Link href="/demo" className="underline font-bold ml-2">← Back to Standard Demo</Link>
+      {/* Advanced Mode Banner — clean, enterprise indigo */}
+      <div className="bg-indigo-500/10 border-b border-indigo-500/30 text-center py-1.5 px-4 text-xs text-indigo-300 flex items-center justify-center gap-2">
+        <GraduationCap className="w-3.5 h-3.5" />
+        <span className="font-semibold">Advanced Mode</span>
+        <span className="text-slate-400">· TCO · Failure Rates · Support Contracts</span>
+        <Link href="/demo" className="text-indigo-400 font-semibold hover:underline ml-1">← Standard Demo</Link>
       </div>
 
       {/* Header */}
       <div className="bg-slate-800 border-b border-slate-700">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-500 flex items-center justify-center">
-              <Shield className="w-6 h-6 text-white" />
+            <div className="w-9 h-9 rounded-md bg-indigo-600 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Advanced Challenge</h1>
-              <p className="text-sm text-slate-400">Design for TCO, not just specs</p>
+              <h1 className="text-base font-semibold text-white">Advanced Challenge</h1>
+              <p className="text-xs text-slate-400">Design for total cost of ownership, not just specs</p>
             </div>
           </div>
-          <Link href="/" className="text-slate-400 hover:text-white text-sm">← Home</Link>
+          <Link href="/" className="text-slate-400 hover:text-white text-xs">← Home</Link>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Intro Panel */}
         {showIntro && (
-          <div className="bg-gradient-to-br from-purple-900/40 to-indigo-900/30 border border-purple-500/40 rounded-xl p-6 mb-4 relative">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-4 relative">
             <button onClick={() => setShowIntro(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
-            <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-purple-400" />
+            <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-400" />
               Welcome to Advanced Mode
             </h2>
             <p className="text-slate-300 text-sm mb-3">

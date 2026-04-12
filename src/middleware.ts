@@ -28,7 +28,7 @@ export default auth((req) => {
   if (pathname.startsWith("/admin")) {
     const role = (req.auth.user as any)?.role;
     if (role !== "superadmin") {
-      return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin));
+      return NextResponse.redirect(new URL("/teacher", req.nextUrl.origin));
     }
   }
 
@@ -37,6 +37,15 @@ export default auth((req) => {
     const role = (req.auth.user as any)?.role;
     if (role !== "teacher" && role !== "superadmin") {
       return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin));
+    }
+  }
+
+  // Teachers belong in the Command Center — redirect them away from the
+  // student dashboard so they follow the teacher workflow automatically.
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
+    const role = (req.auth.user as any)?.role;
+    if (role === "teacher" || role === "superadmin") {
+      return NextResponse.redirect(new URL("/teacher", req.nextUrl.origin));
     }
   }
 

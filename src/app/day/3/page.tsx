@@ -96,8 +96,8 @@ export default function Day3Page() {
       </div>
 
       {/* Advanced Extension Ribbon */}
-      <div className="bg-purple-900/40 border-b border-purple-500/30 text-center py-1.5 px-4 text-xs text-purple-200">
-        🎓 Going deeper? Try <Link href="/demo-advanced" className="font-bold underline text-purple-300 hover:text-white">Advanced Mode</Link> to see how 3-year TCO changes your rack decisions
+      <div className="app-muted border-b app-border text-center py-1.5 px-4 text-xs app-text-muted">
+        🎓 Going deeper? Try <Link href="/demo-advanced" className="app-accent-text font-semibold hover:underline">Advanced Mode</Link> to see how 3-year TCO changes your rack decisions
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6">

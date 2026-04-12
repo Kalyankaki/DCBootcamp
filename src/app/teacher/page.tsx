@@ -109,29 +109,40 @@ export default function TeacherDashboard() {
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
-      <div className="bg-indigo-950 border-b border-indigo-800">
+      <div className="bg-slate-800 border-b border-slate-700">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <GraduationCap className="w-7 h-7 text-indigo-400" />
+            <div className="w-8 h-8 rounded-md bg-indigo-600 flex items-center justify-center">
+              <GraduationCap className="w-4 h-4 text-white" />
+            </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Teacher Command Center</h1>
-              <p className="text-xs text-indigo-300">DC Bootcamp — Spring Break Camp</p>
+              <h1 className="text-base font-semibold text-white">Teacher Command Center</h1>
+              <p className="text-xs text-slate-400">DC Bootcamp · Session planning and delivery</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             {timerRunning && (
-              <div className={`flex items-center gap-2 font-mono font-bold text-xl ${timerSeconds > 60 ? "text-emerald-400" : timerSeconds > 10 ? "text-amber-400" : "text-red-400 animate-pulse"}`}>
-                <Timer className="w-5 h-5" /> {fmtTime(timerSeconds)}
+              <div className={`flex items-center gap-2 font-mono font-semibold text-base ${timerSeconds > 60 ? "text-emerald-400" : timerSeconds > 10 ? "text-amber-400" : "text-red-400 animate-timer-pulse"}`}>
+                <Timer className="w-4 h-4" /> {fmtTime(timerSeconds)}
               </div>
             )}
-            <Link href="/dashboard" className="text-indigo-300 hover:text-white text-sm">← Dashboard</Link>
+            <Link href="/" className="text-slate-400 hover:text-white text-xs">← Home</Link>
           </div>
         </div>
         {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-4 flex gap-1">
+        <div className="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {([["agenda", BookOpen, "Agenda"], ["slides", Presentation, "Slides"], ["progress", Users, "Students"], ["reference", BookMarked, "Reference"], ["advanced", Sparkles, "Advanced"]] as const).map(([key, Icon, label]) => (
-            <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${tab === key ? "border-indigo-400 text-indigo-300" : "border-transparent text-slate-400 hover:text-white"}`}>
-              <Icon className="w-4 h-4" />{label}
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                tab === key
+                  ? "border-indigo-400 text-indigo-300"
+                  : "border-transparent text-slate-400 hover:text-white"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
             </button>
           ))}
         </div>

@@ -610,36 +610,46 @@ export default function DemoPage() {
   return (
     <div className="min-h-screen bg-slate-900">
       <AchievementToast achievements={achievements} />
-      {/* Demo Banner */}
-      <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-black text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2">
-        <Sparkles className="w-4 h-4" />
-        Demo Mode — Try Day 1 without signing in!
-        <Link href="/login" className="underline font-bold ml-2">Sign in for the full 5-day experience →</Link>
+      {/* Demo Banner — clean, professional, not a rainbow gradient */}
+      <div className="bg-blue-500/10 border-b border-blue-500/30 text-center py-1.5 px-4 text-xs text-blue-300 flex items-center justify-center gap-2">
+        <Sparkles className="w-3.5 h-3.5" />
+        <span className="font-semibold">Demo Mode</span>
+        <span className="text-slate-400">· Try Day 1 without signing in</span>
+        <Link href="/login" className="text-blue-400 font-semibold hover:underline ml-1">Sign in →</Link>
       </div>
       {/* Advanced Mode Ribbon */}
-      <div className="bg-purple-900/40 border-b border-purple-500/30 text-center py-1.5 px-4 text-xs text-purple-200">
-        🎓 Want more? Try <Link href="/demo-advanced" className="font-bold underline text-purple-300 hover:text-white">Advanced Mode</Link> — TCO, failure rates, and support contracts for higher-grade students
+      <div className="bg-slate-800/60 border-b border-slate-700 text-center py-1.5 px-4 text-xs text-slate-400">
+        Going deeper? Try <Link href="/demo-advanced" className="text-blue-400 font-semibold hover:underline">Advanced Mode</Link> — TCO, failure rates, and support contracts
       </div>
 
       {/* Header */}
       <div className="bg-slate-800 border-b border-slate-700">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500 flex items-center justify-center">
-              <Cpu className="w-6 h-6 text-white" />
+            <div className="w-9 h-9 rounded-md bg-blue-600 flex items-center justify-center">
+              <Cpu className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Day 1: Inside the Motherboard</h1>
-              <p className="text-sm text-slate-400">Learn, Quiz, Build — no login needed!</p>
+              <h1 className="text-base font-semibold text-white">Day 1 · Inside the Motherboard</h1>
+              <p className="text-xs text-slate-400">Interactive demo · Learn, quiz, build</p>
             </div>
           </div>
-          <Link href="/" className="text-slate-400 hover:text-white text-sm">← Home</Link>
+          <Link href="/" className="text-slate-400 hover:text-white text-xs">← Home</Link>
         </div>
         {/* Tabs */}
         <div className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {([["learn", BookOpen, "Learn"], ["workloads", Globe, "Workloads"], ["quiz", Star, "Quiz"], ["build", Gamepad2, "Build"], ["dojo", Calculator, "Math Dojo"]] as const).map(([key, Icon, label]) => (
-            <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === key ? "border-emerald-500 text-emerald-400" : "border-transparent text-slate-400 hover:text-white"}`}>
-              <Icon className="w-4 h-4" />{label}
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                tab === key
+                  ? "border-blue-500 text-blue-400"
+                  : "border-transparent text-slate-400 hover:text-white"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
             </button>
           ))}
         </div>
